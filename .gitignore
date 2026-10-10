@@ -1,0 +1,35 @@
+# dev-harness 进度账本：不进 git，任何回退都碰不到它
+progress/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+*.log
+npm-debug.log*
+
+# 演示运行产生的证据文件（每次 `make demo` 重新生成，不入库）。
+# **前导斜杠不能省**：写成 `evidence/` 在 gitignore 语义里匹配**任意层级**的同名目录，
+# 会把包目录 `pactpay/evidence/` 一起吞掉 —— 实测踩过：`pactpay/evidence/verify.py`
+# 被静默忽略、没进提交，本地测试照旧全绿，克隆出来却连测试都收集不起来。
+# 守卫见 `tests/test_repo_hygiene.py`。
+/evidence/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# 环境变量与密钥（测试网凭证也绝不入库）
+# `.env` 的任何变体都挡掉——包括 .env.bak-* 这类临时备份（踩过：备份文件没被挡住、
+# 差点把 API key 提交上去）。.env.example 是空模板，要进库，所以单独放行。
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store

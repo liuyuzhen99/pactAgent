@@ -1,0 +1,16 @@
+# 运行时依赖（版本钉死：x402 在快速迭代期，不钉等于把方案建在流沙上）
+#
+# 说明：**没有** `cobo-agentic-wallet`。虽然官方 SDK 存在（0.1.40）且带
+# `PolicyDeniedError`，但本项目直接走 REST（`pactpay/cobo.py`，httpx），
+# 一行都没 import 它 —— 留着会让人以为它在被使用。需要时再加回来。
+# x402 收款方需要 fastapi（服务端中间件）与 evm（EVM 机制，不装会 ImportError）
+x402[fastapi,evm]==2.25.0
+
+# 直连 Cobo REST 端点用（SDK 覆盖不到的部分，以及 T0 的独立核验）
+httpx>=0.28.1
+
+# 测试
+pytest>=8.0.0
+
+# 读 .env（凭证绝不进 git）
+python-dotenv>=1.0.0
