@@ -196,6 +196,59 @@ class CoboClient:
     def get_pact(self, pact_id: str) -> dict[str, Any]:
         return self.request("GET", f"/api/v1/pacts/{pact_id}")
 
+    def revoke_pact(self, pact_id: str) -> dict[str, Any]:
+        """**撤销**一份 Pact（`make revoke-check` 用它）。
+
+        这是"人类随时能收权"的落点，而且它在**平台侧**——不在 Agent 进程里。
+        这一点很要紧：如果 kill switch 实现在我们自己的循环里，一个被攻破或
+        幻觉驱动的 Agent 直接跳过那个判断就行了；撤销 Pact 则绕不过去，
+        因为**后续每一次签名都要经过 Cobo**。
+
+        撤销后这个 Pact 的 api_key 立刻什么都干不了（下一个签名请求会被拒）。
+        """
+        return self.request("POST", f"/api/v1/pacts/{pact_id}/revoke", {})
+
+    def list_pact_events(self, pact_id: str, **params: Any) -> dict[str, Any]:
+        """某一 Pact 的事件列表（普通 GET，不是 SSE 流）。"""
+        return self._get(f"/api/v1/pacts/{pact_id}/events", {k: v for k, v in params.items() if v is not None})
+
+    def event_stream(self, *, timeout_s: float = 30.0, accept: str = "text/event-stream"):
+        """订阅**服务端事件流**（SSE），逐条 yield `(event_type, data_dict)`。
+
+        用 `httpx.stream` 而不是普通请求——SSE 是**长连接**，普通请求会一直挂着
+        等响应结束（永远不会结束）。
+
+        这是真正的实时告警通道，而且它是**平台推给我们的**：
+        `policy.violated` 事件带 `details.denial_code`，发生在我们这边发请求的**同时**，
+        不依赖我们事后去审计日志里翻。
+
+        `heartbeat` 每 30 秒一条（实测文档如此），调用方要容忍它。
+        """
+        url = f"{self.base_url}/api/v1/events/stream"
+        headers = {"Accept": accept}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        with httpx.stream("GET", url, headers=headers, timeout=timeout_s) as response:
+            response.raise_for_status()
+            event_type = "message"
+            data_lines: list[str] = []
+            for line in response.iter_lines():
+                if line.startswith("event:"):
+                    event_type = line[len("event:"):].strip()
+                elif line.startswith("data:"):
+                    data_lines.append(line[len("data:"):].strip())
+                elif not line:
+                    # 空行 = 一条事件结束
+                    if data_lines:
+                        raw = "\n".join(data_lines)
+                        try:
+                            payload = json.loads(raw)
+                        except ValueError:
+                            payload = {"_raw": raw}
+                        yield event_type, payload
+                    event_type = "message"
+                    data_lines = []
+
     def transfer(
         self,
         wallet_uuid: str,

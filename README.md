@@ -64,6 +64,11 @@ make dashboard
 ### 想单独验某一项
 
 ```bash
+make revoke-check   # 人类随时能收权：撤销后同一个 key 立刻什么都干不了（不花钱）
+make events         # 实时告警通道：SSE 推送 + 轮询审计日志两条路都试，如实报结论
+```
+
+```bash
 make test             # 全部单测
 make a0e              # x402 付款全链路探针（含链上复核）
 make pact             # R1：Pact 提交后回读一致，且 status 真的是 active
@@ -168,6 +173,97 @@ Pact 里写死的规则：
 
 ---
 
+## 凭据是怎么放的（谁拿着什么）
+
+这一节把"**这个 Agent 到底握着什么凭据**"写清楚——因为这决定了它被攻破时
+最坏能发生什么。**先说结论：这里没有私钥，Python 代码也从不读私钥。**
+
+### 三样东西，放在三个地方
+
+| 东西 | 在哪 | 谁能读到 |
+|---|---|---|
+| **API key**（`AGENT_WALLET_API_KEY`） | 项目目录的 `.env`（已 gitignore） | **Agent 进程**。它是 bearer 凭据 |
+| **MPC 密钥分片** | `~/.cobo-agentic-wallet/profiles/<profile>/tss-node/db/secrets.db` | **本机 TSS 节点进程**，不是 Agent |
+| **分片库的口令** | 同目录下的 `.password`（明文文件） | 能读那个目录的人 |
+
+钱包是 **MPC 2-of-2**：本机 TSS 节点持一片，Cobo 持另一片，**两片都在才能签名**。
+本机常驻的签名进程长这样（`ps` 实况）：
+
+```
+cobo-tss-node start --caw --prod \
+  --key-file .../tss-node/.password \
+  --db       .../tss-node/db/secrets.db
+```
+
+Python 那边**一行都不碰私钥**——`grep -riE "private_key|keystore|mnemonic"` 在
+`pactpay/` 下**零结果**。Agent 只会拿着 API key 发 HTTP。
+
+### 那 Agent 被攻破会怎样
+
+攻击者拿到 `.env` 里的 API key，能做的事**被两层夹住**：
+
+1. **API key 是 pact-scoped 的，不是根 key**。它只能在这个 Pact 允许的范围内动钱
+   （单笔 ≤ 0.01、收款方白名单内、24h 内）。这一点在本项目里是**实测**的：
+   用根 key 走付款路径会被拒（`INSUFFICIENT_PERMISSION`），必须换上
+   `get_pact(pact_id)["result"]["api_key"]` 才通。
+2. **24 小时到期**。过期后这个 key 什么都干不了。
+
+**所以这个项目的安全模型不是"藏好私钥"，是"就算凭据泄露，它能造成的损失也被
+平台侧的策略封顶了"。** 这正是它想演示的那件事。
+
+### 一处实测与文档不符（记在案）
+
+官方文档 `developer/audit.md` 有一节 "Real-time events (SSE)"，写的是：
+
+```
+GET {API_URL}/api/v1/events/stream
+Headers: X-API-Key: OWNER_API_KEY, Accept: text/event-stream
+```
+
+**实测这个路由在当前部署上不存在**：
+
+| 请求 | 结果 |
+|---|---|
+| 带 agent key | **404** |
+| **不带任何 key** | **404**（⇒ 不是权限问题，是路由没有） |
+| 带尾斜杠 / `/api/v1/events` / `/audit-logs/stream` | 全部 404 |
+| **对照**：`GET /api/v1/audit-logs?limit=1` | **200** ✓ |
+
+所以"平台推事件给我们"这条**实时告警**通道目前用不了。
+`make events` 会把这件事如实打出来，然后**退回轮询审计日志**（那条路是通的，
+实测 2 秒内就能看到新的拒绝行）。
+
+**但轮询比推送弱**：有延迟，而且进程挂了就没人看着。它是"近实时"，不是"实时"。
+两者共同的关键性质是**都不是 Agent 自己能造的** —— 这一条比 push/poll 的区别更重要。
+
+### 2-of-2 挡住了什么、挡不住什么
+
+| 情况 | 2-of-2 管用吗 |
+|---|---|
+| 只偷到本机的密钥分片 | ✅ **管用**——还差 Cobo 那片，签不出名 |
+| 只偷到 Cobo 那边的分片 | ✅ **管用**——同上，反过来 |
+| **整个本机被读**（分片 + 旁边的明文口令） | ❌ **不管用**——两样在同一目录里 |
+| **只偷到 API key** | ⚠️ 靠上面的两层夹住，**不是靠 2-of-2** |
+
+**如实说明**：分片库的口令 `.password` 是明文文件，就放在 `secrets.db` 旁边。
+所以"本机被完全读取"这一档，MPC 保护不了——**这一点我们不做没有的承诺**。
+
+要真正加固这一档，得把 TSS 节点挪到独立 OS 用户或独立主机上。那是**运维层面**的事，
+而"生产级密钥管理"在本项目的**非目标清单**里（见下一节）。
+
+### 撤销：人类随时能收权
+
+权限不是只能等到期——平台提供了撤销：
+
+```bash
+make revoke-check    # 撤销 Pact → 立刻重试同一笔 → 确认被拒
+```
+
+这是"边界是硬性的"最直接的证明：**撤销之后，同一个 API key、同一个钱包、
+同一个请求，立刻什么都干不了**，而且这发生在**平台侧**，不是 Agent 自己让着自己。
+
+---
+
 ## 这个项目不做什么
 
 明确边界：这是一个最小可行演示，**不涉及**——
@@ -199,6 +295,8 @@ pactpay/
   onchain.py           Base Sepolia RPC 复核：解 USDC Transfer 事件、核对 from/to/value
   cumulative_check.py  累计上限拒绝检查（make cumulative-check）
   complete_check.py    完成条件（tx_count/time_elapsed/amount_spent）检查（make complete-check）
+  revoke_check.py      撤销 Pact → 同一 key 立刻失效（make revoke-check，零成本）
+  event_watch.py       实时告警通道检查：SSE 不可用时如实说明并退回轮询（make events）
   demo.py              演示主流程（make demo）
   payee/app.py         收款方：两个付费 API（make payee）
   payee_lifecycle.py   一条命令里自起自停收款方

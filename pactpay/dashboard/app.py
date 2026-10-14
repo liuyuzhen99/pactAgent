@@ -36,8 +36,20 @@ from pactpay.evidence import (
 # user_transaction.list …）都是查询类噪声，不上页面。
 DECISION_ACTION_PREFIXES = ("transfer.", "contract_call.", "payment.", "pact.", "delegation.")
 
+#: 证据来源的**如实标注**（第 7 项收尾）。
+#:
+#: `cobo_audit_log` 这行原先写的是「Cobo 审计日志（**不可篡改**）」—— 那是**说过了**：
+#:
+#: - 审计行由 Cobo **服务端签发**，我们改不了服务端那一份，这一半是真的；
+#: - 但**证据文件里存的是我们自己抄下来的一份快照**。第 6 轮独立评审实测证明：
+#:   把某条 `transfer.denied` 的 `result` 改成 `allowed`、改掉 `request.amount`、
+#:   甚至删掉 50 条里的 40 条，校验**照样通过**（上游复核当时只固定了 `id` + `action`）。
+#:
+#: 所以页面上不该出现"不可篡改"这四个字。**它现在的真实强度是**：
+#: 那份快照会被 `make verify` 现场回 Cobo 逐字段重查，对不上就判不通过 ——
+#: 这是**可检测**，不是**不可篡改**。README 里那段边界的措辞与此保持一致。
 SOURCE_LABELS = {
-    "cobo_audit_log": "Cobo 审计日志（不可篡改）",
+    "cobo_audit_log": "Cobo 审计日志（快照会被 make verify 现场回 Cobo 重查）",
     "cobo_payment_response": "Cobo 付款响应（该路径审计日志不记录此拒绝）",
 }
 

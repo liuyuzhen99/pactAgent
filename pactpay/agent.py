@@ -16,14 +16,15 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
-from pactpay.cobo import CoboClient, PolicyDenied
+from pactpay.cobo import CoboClient, CoboError, PolicyDenied
 from pactpay.planner import Purchase
 
 HTTP_TIMEOUT_S = 30
@@ -161,6 +162,34 @@ def probe_default_deny(
     }
 
 
+#: 一次采购最多尝试几次（首次 + 重试）。
+MAX_ATTEMPTS = 3
+#: 每次重试前的等待秒数（第 n 次重试前等 BACKOFF_S[n-1]）。
+BACKOFF_S = (1.0, 3.0)
+
+
+class _Transient(RuntimeError):
+    """**可重试**的失败：网络抖动、5xx、429。
+
+    与"策略拒绝"和"配置/证据错误"**严格分开**——那两类重试要么毫无意义
+    （策略是确定性的，再来一次还是拒），要么会**掩盖真问题**
+    （结算头坏了重试一次"成功"了，等于把一次无法验证的付款洗成正常的）。
+
+    `outcome` 装的是"**如果不再重试、本该返回的那个结果**"。
+    这样重试耗尽时能把它还回去，**不丢机器可读的 `code`** ——
+    `make verify` 和看板都靠那些字段判读，退化成一句自由文本就把它们废了。
+    """
+
+    def __init__(self, message: str, *, outcome: PurchaseOutcome | None = None) -> None:
+        super().__init__(message)
+        self.outcome = outcome
+
+
+def _transient_status(status: int) -> bool:
+    """5xx 和 429 算暂时性；4xx 其余（403/422 等）是**确定性**的，重试无意义。"""
+    return status >= 500 or status == 429
+
+
 def buy(
     client: CoboClient,
     payee_base: str,
@@ -168,11 +197,81 @@ def buy(
     *,
     wallet_uuid: str,
     pact_api_key: str,
+    max_attempts: int = MAX_ATTEMPTS,
+    sleep: Callable[[float], None] | None = None,
 ) -> PurchaseOutcome:
-    """买一笔。放行或拒绝都如实返回，不抛给调用方（`expect_error` 的语义在这里收口）。"""
+    """买一笔。放行或拒绝都如实返回，不抛给调用方（`expect_error` 的语义在这里收口）。
+
+    ## 重试与幂等（第 7 项收尾）
+
+    一次采购在"签名之后、上链确认之前"可能因为网络中断而结果不明。**盲目重发会
+    产生第二笔支付**，所以这里：
+
+    1. `request_id` **在重试循环之外生成一次**，所有尝试共用它。
+       它是 Cobo 的幂等键：同一个值重复提交会**返回原始结果**而不重复扣款
+       （响应里的 `idempotent=true` 就是"这是重放、不是新交易"的标记）。
+    2. **只重试暂时性失败**：网络错误、5xx、429。
+       策略拒绝（`PolicyDenied`）**绝不重试**——那是确定性的，再来一次还是拒，
+       重试只会把"硬边界"演成"偶发故障"。
+       结算哈希形状不对、收款方没收钱就给东西，也**不重试**——那是证据问题，
+       重试一次"成功"了等于把一次验不过的付款洗白。
+    3. 重试用尽仍失败 ⇒ 返回 `failed`，并把**试了几次**写进原因。
+    """
+    # **一次生成，全程复用。** 放在循环里就是把幂等键作废了。
+    request_id = str(uuid.uuid4())
+    waiter = sleep or time.sleep
+    last: _Transient = _Transient("（没有尝试过）")
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return _attempt_buy(
+                client, payee_base, purchase,
+                wallet_uuid=wallet_uuid, pact_api_key=pact_api_key, request_id=request_id,
+            )
+        except _Transient as transient:
+            last = transient
+            last_reason = str(transient)
+            if attempt < max_attempts:
+                waiter(BACKOFF_S[min(attempt - 1, len(BACKOFF_S) - 1)])
+
+    # 走到这里 = 每次都撞上暂时性失败。**如实报失败，并说清试了几次**——
+    # 不能因为"重试过了"就含混过去。
+    if last.outcome is not None:
+        # 还回最后一次的实际结果，只把"试了几次"补进原因 —— 机器可读字段一个不丢。
+        return replace(
+            last.outcome,
+            denial={**(last.outcome.denial or {}),
+                    "reason": f"重试 {max_attempts} 次仍未成功：{last_reason}"},
+        )
+    return PurchaseOutcome(
+        resource=purchase.resource,
+        amount_usd=purchase.amount_usd,
+        description=purchase.description,
+        outcome="failed",
+        http_status=0,
+        data=None,
+        settlement_tx=None,
+        denial={"reason": f"重试 {max_attempts} 次仍未成功：{last_reason}", "api": "payment"},
+        request_id=request_id,
+    )
+
+
+def _attempt_buy(
+    client: CoboClient,
+    payee_base: str,
+    purchase: Purchase,
+    *,
+    wallet_uuid: str,
+    pact_api_key: str,
+    request_id: str,
+) -> PurchaseOutcome:
+    """**一次**尝试。暂时性失败抛 `_Transient`，其余如实返回 `PurchaseOutcome`。"""
     url = payee_base + purchase.resource
 
-    challenge_response = httpx.get(url, timeout=HTTP_TIMEOUT_S)
+    try:
+        challenge_response = httpx.get(url, timeout=HTTP_TIMEOUT_S)
+    except httpx.HTTPError as error:
+        raise _Transient(f"向收款方要 402 挑战时网络失败：{type(error).__name__}") from error
     challenge = challenge_response.headers.get("PAYMENT-REQUIRED")
     if challenge_response.status_code != 402 or not challenge:
         # 收款方没收钱就给了东西 → 绝不能记成 paid（否则 Dashboard 会显示一笔
@@ -182,8 +281,6 @@ def buy(
             f"HTTP {challenge_response.status_code}（收款方的 x402 中间件可能没挂上）"
         )
 
-    # 幂等键每笔都换：同一个值重放会返回旧结果而不重复扣款。
-    request_id = str(uuid.uuid4())
     try:
         result = client.payment(
             wallet_uuid,
@@ -192,7 +289,15 @@ def buy(
             x402_payment_required=challenge,
             api_key=pact_api_key,
         )
+    except (httpx.HTTPError, CoboError) as error:
+        # 网络错误或 5xx/429 ⇒ 可重试。注意 `request_id` 是复用的，
+        # 所以重试**不会**产生第二笔支付。
+        status = getattr(error, "status", 0) or 0
+        if isinstance(error, httpx.HTTPError) or _transient_status(status):
+            raise _Transient(f"提交付款失败：{type(error).__name__} status={status}") from error
+        raise
     except PolicyDenied as denied:
+        # **绝不重试**：策略是确定性的，再来一次还是拒。
         return PurchaseOutcome(
             resource=purchase.resource,
             amount_usd=purchase.amount_usd,
@@ -207,7 +312,21 @@ def buy(
 
     inner = result.get("result") or {}
     retry_headers = inner.get("retry_headers") or {}
-    replay = httpx.get(url, headers=retry_headers, timeout=HTTP_TIMEOUT_S)
+    try:
+        replay = httpx.get(url, headers=retry_headers, timeout=HTTP_TIMEOUT_S)
+    except httpx.HTTPError as error:
+        # 付款**可能已经提交**了。复用同一个 request_id 重试是安全的：
+        # Cobo 会认出这是同一笔，返回原结果而不是再扣一次。
+        raise _Transient(
+            f"带签名重放时网络失败：{type(error).__name__}",
+            outcome=_not_settled(purchase, None, request_id, f"重放网络失败：{type(error).__name__}"),
+        ) from error
+    if _transient_status(replay.status_code):
+        raise _Transient(
+            f"带签名重放返回 HTTP {replay.status_code}（暂时性）",
+            outcome=_not_settled(purchase, replay, request_id,
+                                 f"重放返回 HTTP {replay.status_code}（不是 200）"),
+        )
 
     settlement_tx = None
     payment_response = replay.headers.get("PAYMENT-RESPONSE")
@@ -279,7 +398,7 @@ def looks_like_a_tx_hash(value: Any) -> bool:
 
 def _not_settled(
     purchase: Purchase,
-    replay: httpx.Response,
+    replay: httpx.Response | None,
     request_id: str,
     reason: str,
     *,
@@ -291,13 +410,16 @@ def _not_settled(
     `denied` = 策略在签名前挡住了（钱没动，是**预期**结果）；
     `failed` = 策略放行了但没结算成功（钱可能动了一半、或根本没动，是**异常**结果）。
     混在一起会让看板把"基础设施故障"读成"边界生效"，正好把这个项目要证明的事说反。
+
+    `replay=None` 表示**重放请求根本没发出去**（网络就断了）——
+    这时没有 HTTP 状态可报，如实记 0，不当成"收到了一个响应"。
     """
     return PurchaseOutcome(
         resource=purchase.resource,
         amount_usd=purchase.amount_usd,
         description=purchase.description,
         outcome="failed",
-        http_status=replay.status_code,
+        http_status=replay.status_code if replay is not None else 0,
         data=None,
         settlement_tx=settlement_tx,
         denial={

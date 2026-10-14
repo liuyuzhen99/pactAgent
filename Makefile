@@ -1,4 +1,4 @@
-.PHONY: help install t0-probe a0e demo agent verify pact dashboard complete-check cumulative-check boundary-check payee test clean
+.PHONY: help install t0-probe a0e demo agent verify revoke-check events pact dashboard complete-check cumulative-check boundary-check payee test clean
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -10,6 +10,8 @@ help:
 	@echo "demo      —— 演示主流程：两笔采购（一笔成功、一笔被拒）+ 证据落盘"
 	@echo "agent     —— 让模型自己驱动一次真实采购（工具调用主循环，全程留痕）"
 	@echo "pact      —— A1：验证提交的 Pact 被服务端原样存下（逐字段比对）"
+	@echo "revoke-check —— 撤销 Pact → 立刻重试 → 确认被拒（人类随时能收权，零成本）"
+	@echo "events    —— 订阅 Cobo 事件流，实时看 policy.violated"
 	@echo "verify    —— A7a：校验最近一次运行的证据哈希链与计数"
 	@echo "dashboard —— 起证据展示页，默认 http://127.0.0.1:8000"
 	@echo "complete-check —— T9：验证完成条件触发后 Pact 自动终止、密钥失效"
@@ -42,6 +44,12 @@ demo:
 
 agent: ## 让模型自己驱动一次真实采购（Agent 主循环，工具调用）
 	.venv/bin/python -m pactpay.agent_run
+
+revoke-check: ## 撤销 Pact 后同一个 key 立刻失效（零成本：全程只用超限转账）
+	.venv/bin/python -m pactpay.revoke_check
+
+events: ## 订阅 Cobo 事件流，实时看 policy.violated
+	.venv/bin/python -m pactpay.event_watch $(ARGS)
 
 # T9：完成条件（tx_count=1）触发后 Pact 自动终止、pact-scoped key 立即失效。
 # 需要先 make payee，且钱包里有测试币（本检查会真的花掉一笔）。

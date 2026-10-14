@@ -571,3 +571,126 @@ def test_a_payment_whose_response_carries_a_bogus_hash_is_not_recorded_as_paid(m
 
     assert outcome.outcome != "paid", "形状不对的哈希竟然被记成了 paid"
     assert outcome.settlement_tx is None
+
+
+# ---------------------------------------------------------------------------
+# 重试与幂等（第 7 项收尾）：重试**必须复用同一个 request_id**
+# ---------------------------------------------------------------------------
+
+
+def _flaky_then_ok(monkeypatch, *, fail_times: int, fail_status: int = 503):
+    """收款方先坏 `fail_times` 次，之后正常。用来测"重试后成功"。"""
+    state = {"n": 0}
+
+    def fake_get(url: str, headers=None, timeout=None):  # noqa: ANN001
+        if not (headers or {}).get("PAYMENT-SIGNATURE"):
+            return httpx.Response(
+                402, headers={"PAYMENT-REQUIRED": _challenge_header(CHEAP_ATOMIC)},
+                json={}, request=httpx.Request("GET", url),
+            )
+        state["n"] += 1
+        if state["n"] <= fail_times:
+            return httpx.Response(
+                fail_status, json={"error": "boom"}, request=httpx.Request("GET", url),
+            )
+        return httpx.Response(
+            200, headers={"PAYMENT-RESPONSE": _settlement_header(CHEAP_TX)},
+            json={"report_id": "cheap-raw-001"}, request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    return state
+
+
+def test_retries_reuse_the_same_request_id(monkeypatch):
+    """**这个模块最重要的一条。**
+
+    重试时若换一个新的 `request_id`，Cobo 就不认得这是同一笔，
+    **会真的再扣一次钱**。幂等键的全部意义就在于"重试复用同一个值"。
+    """
+    _flaky_then_ok(monkeypatch, fail_times=2)
+    cobo = FakeCobo()
+
+    outcome = buy(cobo, "http://127.0.0.1:8001", CHEAP,
+                  wallet_uuid="w", pact_api_key="k", sleep=lambda _s: None)
+
+    assert outcome.outcome == "paid", "重试后应当成功"
+    ids = [p["request_id"] for p in cobo.payments]
+    assert len(ids) == 3, f"应当尝试 3 次（失败 2 次 + 成功 1 次），实际 {len(ids)}"
+    assert len(set(ids)) == 1, f"重试必须复用同一个 request_id，实际拿到 {ids}"
+    assert outcome.request_id == ids[0], "结论里记的也必须是那个复用的 id"
+
+
+def test_a_policy_denial_is_never_retried(monkeypatch):
+    """策略拒绝是**确定性**的——重试只会把"硬边界"演成"偶发故障"。"""
+    _fake_httpx(monkeypatch)
+    denied = PolicyDenied(
+        403, "X402_POLICY_DENIED", "x402_no_matching_payment",
+        {"reject_details": [{"policy_reason": "matched_pact_transfer_deny_if", "policy_id": "p1"}]},
+    )
+    cobo = FakeCobo(deny_with=denied)
+
+    outcome = buy(cobo, "http://127.0.0.1:8001", PREMIUM,
+                  wallet_uuid="w", pact_api_key="k", sleep=lambda _s: None)
+
+    assert outcome.outcome == "denied"
+    assert len(cobo.payments) == 1, f"策略拒绝只该试 1 次，实际 {len(cobo.payments)} 次"
+
+
+def test_a_missing_402_challenge_is_never_retried(monkeypatch):
+    """收款方没收钱就给东西 ⇒ 配置错误，重试无意义（且重试会掩盖它）。"""
+    calls = {"n": 0}
+
+    def fake_get(url, headers=None, timeout=None):  # noqa: ANN001
+        calls["n"] += 1
+        return httpx.Response(200, json={"free": True}, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    with pytest.raises(RuntimeError, match="期望 402"):
+        buy(FakeCobo(), "http://127.0.0.1:8001", CHEAP,
+            wallet_uuid="w", pact_api_key="k", sleep=lambda _s: None)
+
+    assert calls["n"] == 1, f"这类错误不该重试，实际请求了 {calls['n']} 次"
+
+
+def test_backs_off_between_attempts(monkeypatch):
+    """重试之间必须等待——否则就是把瞬时故障打成连环请求。"""
+    _flaky_then_ok(monkeypatch, fail_times=2)
+    waits: list[float] = []
+
+    buy(FakeCobo(), "http://127.0.0.1:8001", CHEAP,
+        wallet_uuid="w", pact_api_key="k", sleep=waits.append)
+
+    assert waits == [1.0, 3.0], f"两次重试前应分别等 1s / 3s，实际 {waits}"
+
+
+def test_exhausted_retries_keep_the_machine_readable_code(monkeypatch):
+    """重试用尽 ⇒ `failed`，说清试了几次，**且机器可读字段一个不丢**。
+
+    `make verify` 和看板都靠 `denial["code"]` 判读；退化成一句自由文本就把它们废了。
+    """
+    _fake_httpx_with_broken_replay(monkeypatch, replay_status=503)
+    cobo = FakeCobo()
+
+    outcome = buy(cobo, "http://127.0.0.1:8001", CHEAP,
+                  wallet_uuid="w", pact_api_key="k", sleep=lambda _s: None)
+
+    assert outcome.outcome == "failed"
+    assert outcome.denial is not None
+    assert outcome.denial["code"] == "PAYMENT_NOT_SETTLED", "机器可读的 code 不能丢"
+    assert "重试 3 次" in outcome.denial["reason"], f"要说清试了几次：{outcome.denial['reason']}"
+    assert len(cobo.payments) == 3
+    assert len({p["request_id"] for p in cobo.payments}) == 1, "失败路径也必须复用同一个 id"
+
+
+def test_a_4xx_replay_is_not_retried(monkeypatch):
+    """4xx 是确定性的（比如参数不对），重试无意义。"""
+    _fake_httpx_with_broken_replay(monkeypatch, replay_status=400)
+    cobo = FakeCobo()
+
+    outcome = buy(cobo, "http://127.0.0.1:8001", CHEAP,
+                  wallet_uuid="w", pact_api_key="k", sleep=lambda _s: None)
+
+    assert outcome.outcome == "failed"
+    assert len(cobo.payments) == 1, f"4xx 不该重试，实际 {len(cobo.payments)} 次"
