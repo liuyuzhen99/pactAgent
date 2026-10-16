@@ -18,9 +18,9 @@ import sys
 import uuid
 from typing import Any
 
-from pactpay.cobo import CoboClient
-from pactpay.demo import build_demo_pact_spec
-from pactpay.config import load_existing
+from pactpay.platform.cobo import CoboClient
+from pactpay.demo.run import build_demo_pact_spec
+from pactpay.platform.config import load_existing
 
 
 def _diff(path: str, submitted: Any, readback: Any, out: list[str]) -> None:

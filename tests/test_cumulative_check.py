@@ -22,7 +22,7 @@ _COUNTER_DENIAL = {
                 "current_total": "0.015", "increment": "0.005"},
 }
 
-from pactpay.cumulative_check import (
+from pactpay.checks.cumulative import (
     build_cumulative_pact_spec,
     check_cumulative_denial,
 )
@@ -217,7 +217,7 @@ def test_verdict_fails_when_the_cumulative_cap_never_fired():
     这正是"边界是硬性的"这个主张的反面 —— 如果累计上限根本没触发过，
     这个检查就什么都没证明，绝不能打 ✓。
     """
-    from pactpay.cumulative_check import judge_a5b
+    from pactpay.checks.cumulative import judge_a5b
 
     ok, problems = judge_a5b(
         policies_count=1,
@@ -232,7 +232,7 @@ def test_verdict_fails_when_the_cumulative_cap_never_fired():
 
 def test_verdict_fails_when_the_counter_is_wallet_scoped():
     """新建 Pact 的第一笔就被拒 ⇒ 计数器挂在钱包上，A5b 不成立。"""
-    from pactpay.cumulative_check import judge_a5b
+    from pactpay.checks.cumulative import judge_a5b
 
     ok, problems = judge_a5b(
         policies_count=1, verdict_ok=True, verdict_why="ok",
@@ -245,7 +245,7 @@ def test_verdict_fails_when_the_counter_is_wallet_scoped():
 
 def test_verdict_fails_when_there_are_extra_policies():
     """策略数组不止 1 条 ⇒ 拒绝可能来自别的规则，"不是 per-tx 冒充"就不成立。"""
-    from pactpay.cumulative_check import judge_a5b
+    from pactpay.checks.cumulative import judge_a5b
 
     ok, problems = judge_a5b(
         policies_count=3, verdict_ok=True, verdict_why="ok", fresh_first_outcome="paid",
@@ -257,7 +257,7 @@ def test_verdict_fails_when_there_are_extra_policies():
 
 def test_verdict_passes_only_when_every_condition_holds():
     """**阳性对照**：三条都成立才 ✓。没有它，上面几条可能只是"永远 False"。"""
-    from pactpay.cumulative_check import judge_a5b
+    from pactpay.checks.cumulative import judge_a5b
 
     ok, problems = judge_a5b(
         policies_count=1, verdict_ok=True, verdict_why="ok", fresh_first_outcome="paid",

@@ -24,10 +24,10 @@ from pathlib import Path
 
 import httpx
 
-from pactpay.cobo import CoboClient, CoboError, PolicyDenied
-from pactpay.onchain import USDC_BASE_SEPOLIA, decode_usdc_transfers
-from pactpay.config import TOKEN_ID, load_existing
-from pactpay.pact_spec import build_x402_pact_spec
+from pactpay.platform.cobo import CoboClient, CoboError, PolicyDenied
+from pactpay.platform.onchain import USDC_BASE_SEPOLIA, decode_usdc_transfers
+from pactpay.platform.config import TOKEN_ID, load_existing
+from pactpay.policy.spec import build_x402_pact_spec
 
 PAYEE = "http://127.0.0.1:8001"
 # 单笔上限：0.01 USDC。便宜那笔 0.005 在限内 → 应该成功。
@@ -224,7 +224,7 @@ def main() -> int:
             receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
             check.that("A0e.12 交易已上链且成功", receipt.status == 1, f"block={receipt.blockNumber}")
             # 解 USDC 的 Transfer 事件，证明"钱真的动了"。
-            # 用 `pactpay.onchain` 里那份**同一个**实现——demo（A4）也调它。
+            # 用 `pactpay.platform.onchain` 里那份**同一个**实现——demo（A4）也调它。
             # 之前这里是一段内联拷贝，两份逻辑会各自漂移。
             moved = decode_usdc_transfers(list(receipt.logs), usdc_address=USDC_BASE_SEPOLIA)
             check.that("A0e.13 交易里有 USDC Transfer 事件", len(moved) == 1, f"条数={len(moved)}")

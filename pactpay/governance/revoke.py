@@ -42,9 +42,9 @@ import sys
 from decimal import Decimal
 from typing import Any
 
-from .cobo import CoboClient, CoboError, PolicyDenied
-from .config import CHAIN_ID, TOKEN_ID, load_existing
-from .demo import build_demo_pact_spec
+from pactpay.platform.cobo import CoboClient, CoboError, PolicyDenied
+from pactpay.platform.config import CHAIN_ID, TOKEN_ID, load_existing
+from pactpay.demo.run import build_demo_pact_spec
 
 #: 一个**必然超限**的金额（Pact 的单笔上限是 0.01）。
 #: 用它是因为它无论如何都会被策略挡住 —— 撤销万一没生效也不会转出钱。

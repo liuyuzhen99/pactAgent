@@ -121,7 +121,7 @@ def probe_matched_rule_denial(
 
     超限竟然成功 ⇒ 直接抛错，**不许静默返回 None**——那正是这个演示要证明的反面。
     """
-    from pactpay.cobo import PolicyDenied
+    from pactpay.platform.cobo import PolicyDenied
 
     try:
         client.transfer(
@@ -384,7 +384,7 @@ def count_transfers_in_window(subject: str, from_block: int, to_block: int) -> d
     具名之后它是一条能被直接测的边界：见
     `test_the_window_adapter_actually_queries_the_whole_window`。
     """
-    from pactpay.onchain import count_usdc_transfers_from
+    from pactpay.platform.onchain import count_usdc_transfers_from
 
     return count_usdc_transfers_from(subject, from_block=from_block, to_block=to_block)
 

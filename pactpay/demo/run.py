@@ -1,7 +1,7 @@
 """PactPay 演示主流程（T4/T5 的真实端到端）。
 
 跑法：
-    .venv/bin/python -m pactpay.demo
+    .venv/bin/python -m pactpay.demo.run
 
 它做四件事（对应需求 R2→R5）：
 1. 读用户给的任务与总预算（R2）
@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from pactpay.block_evidence import (
+from pactpay.evidence.block import (
     outcome_to_a5c_shape,
     summarize_a5c,
     check_no_onchain_transfer,
@@ -33,8 +33,8 @@ from pactpay.block_evidence import (
     snapshot_wallet,
     wait_for_audit_corroboration,
 )
-from pactpay.agent import PurchaseOutcome, buy, probe_default_deny
-from pactpay.cobo import CoboClient
+from pactpay.agent.pay import PurchaseOutcome, buy, probe_default_deny
+from pactpay.platform.cobo import CoboClient
 from pactpay.evidence import (
     OUTCOMES,
     count_outcomes,
@@ -46,12 +46,12 @@ from pactpay.evidence import (
     write_counts,
     write_run_meta,
 )
-from pactpay.planner import default_planner, make_plan, usd_to_atomic
-from pactpay.onchain import count_usdc_transfers_from, current_block_number, verify_usdc_transfer
-from pactpay.payee_lifecycle import ensure_payee
-from pactpay.preconditions import find_balance, require_balance
-from pactpay.pact_spec import build_x402_pact_spec
-from pactpay.config import CHAIN_ID as _CHAIN_ID, TOKEN_ID as _TOKEN_ID, load_existing
+from pactpay.agent.planner import default_planner, make_plan, usd_to_atomic
+from pactpay.platform.onchain import count_usdc_transfers_from, current_block_number, verify_usdc_transfer
+from pactpay.demo.payee_lifecycle import ensure_payee
+from pactpay.agent.preconditions import find_balance, require_balance
+from pactpay.policy.spec import build_x402_pact_spec
+from pactpay.platform.config import CHAIN_ID as _CHAIN_ID, TOKEN_ID as _TOKEN_ID, load_existing
 
 # 用户原始输入（R2）
 TASK = "帮我买一份数据报告"
@@ -90,7 +90,7 @@ def select_planner():
     if choice == "deterministic":
         return default_planner
     if choice == "llm":
-        from pactpay.llm_planner import llm_planner
+        from pactpay.agent.llm_planner import llm_planner
 
         return llm_planner
     raise RuntimeError(f"PACT_PLANNER 只能是 llm 或 deterministic，实际 {choice!r}")

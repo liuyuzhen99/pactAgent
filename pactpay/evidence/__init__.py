@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pactpay.agent import PurchaseOutcome
+from pactpay.agent.pay import PurchaseOutcome
 
 EVIDENCE_DIR = Path("evidence")
 

@@ -52,10 +52,10 @@ from typing import Any
 
 import httpx
 
-from .cobo import CoboClient, PolicyDenied
-from .config import CHAIN_ID, TOKEN_ID, load_existing
-from .demo import build_demo_pact_spec
-from .revoke_check import OVER_LIMIT
+from pactpay.platform.cobo import CoboClient, PolicyDenied
+from pactpay.platform.config import CHAIN_ID, TOKEN_ID, load_existing
+from pactpay.demo.run import build_demo_pact_spec
+from pactpay.governance.revoke import OVER_LIMIT
 
 #: 实测：文档里的 SSE 端点在当前部署返回 404。留着是为了"哪天它上线了就能用"。
 SSE_PROBE_TIMEOUT_S = 10.0

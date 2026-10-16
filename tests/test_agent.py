@@ -18,9 +18,9 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from pactpay.agent import PurchaseOutcome, buy
-from pactpay.cobo import PolicyDenied
-from pactpay.planner import Purchase
+from pactpay.agent.pay import PurchaseOutcome, buy
+from pactpay.platform.cobo import PolicyDenied
+from pactpay.agent.planner import Purchase
 
 # ---- 手写字面量（Base Sepolia 已独立核验：USDC name()=="USDC"、decimals()==6）----
 USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
@@ -546,7 +546,7 @@ def test_a_402_without_the_challenge_header_is_refused(monkeypatch):
 
 
 def test_a_non_hash_settlement_value_is_not_a_hash():
-    from pactpay.agent import looks_like_a_tx_hash
+    from pactpay.agent.pay import looks_like_a_tx_hash
 
     real = "0x" + "ab" * 32
     assert looks_like_a_tx_hash(real) is True
@@ -561,7 +561,7 @@ def test_a_payment_whose_response_carries_a_bogus_hash_is_not_recorded_as_paid(m
     判据是"真的结算了"，不是"收款方回了个非空字符串"。
     形状不对 ⇒ 这笔付款**没有被验证过** ⇒ 必须是 `failed`，不是 `paid`。
     """
-    from pactpay.agent import buy
+    from pactpay.agent.pay import buy
 
     # 收款方回一个**看着非空、其实不是哈希**的值
     _fake_httpx(monkeypatch, settlement_tx="ok")

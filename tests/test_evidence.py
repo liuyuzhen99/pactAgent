@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pactpay.agent import PurchaseOutcome
+from pactpay.agent.pay import PurchaseOutcome
 from pactpay.evidence import (
     count_outcomes,
     match_audit_denial,

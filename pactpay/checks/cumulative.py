@@ -24,13 +24,13 @@ from typing import Any
 
 import httpx
 
-from pactpay.cobo import CoboClient, PolicyDenied
-from pactpay.payee_lifecycle import ensure_payee
-from pactpay.config import load_existing
+from pactpay.platform.cobo import CoboClient, PolicyDenied
+from pactpay.demo.payee_lifecycle import ensure_payee
+from pactpay.platform.config import load_existing
 
 # 链/币标识**只有一处定义**（`config.py`）。原先这里、`demo.py`、`complete_check.py`
 # 各写一遍同样的字面量 —— 改一处不会传导到别处，是"四处同名常量"那类静默漂移的温床（N7）。
-from pactpay.config import CHAIN_ID, TOKEN_ID  # noqa: E402
+from pactpay.platform.config import CHAIN_ID, TOKEN_ID  # noqa: E402
 
 PAYEE_URL = "http://127.0.0.1:8001/api/cheap"
 CHEAP_USD = Decimal("0.005")

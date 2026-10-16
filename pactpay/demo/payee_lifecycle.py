@@ -49,7 +49,7 @@ def _spawn(base_url: str) -> subprocess.Popen[Any]:
     """
     port = base_url.rsplit(":", 1)[-1].rstrip("/")
     return subprocess.Popen(  # noqa: S603 - 参数固定，没有用户输入拼接
-        [sys.executable, "-m", "pactpay.payee.app"],
+        [sys.executable, "-m", "pactpay.demo.payee.app"],
         env={**__import__("os").environ, "PAYEE_PORT": port},
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

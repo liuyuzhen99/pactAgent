@@ -150,7 +150,7 @@ def test_a_truncated_run_json_is_not_treated_as_a_complete_run(tmp_path):
     `is_file()`，于是半截文件被选中：`make verify` 打「✓ 通过」而看板 500 ——
     一边说没事一边炸了。
     """
-    from pactpay.dashboard.app import is_complete_run, latest_run_dir
+    from pactpay.demo.dashboard.app import is_complete_run, latest_run_dir
 
     run = _a_healthy_run(tmp_path)
     assert is_complete_run(run) is True
@@ -169,7 +169,7 @@ def test_the_dashboard_shows_a_broken_page_instead_of_500(tmp_path):
     """
     from fastapi.testclient import TestClient
 
-    from pactpay.dashboard.app import create_app
+    from pactpay.demo.dashboard.app import create_app
 
     run = _a_healthy_run(tmp_path)
     (run / "chain.jsonl").write_text('{"seq": 0, "kind": "purchase", "payl', encoding="utf-8")
@@ -302,7 +302,7 @@ def test_starting_denial_is_false_when_the_code_or_status_is_missing():
     原先这里是硬编码的 `True`：只要调用方传进来一个"非 None 的字典"（哪怕里面
     什么都没有），A5c① 就渲染成 ✅。评审把它改回 `True`，254 条测试全绿。
     """
-    from pactpay.block_evidence import summarize_a5c
+    from pactpay.evidence.block import summarize_a5c
 
     matched = {"http_status": 403, "code": "TRANSFER_LIMIT_EXCEEDED", "policy_id": "p-1"}
     corroboration = {"ok": True, "audit_id": 1, "policy_id": "p-1", "why": "已找到"}
@@ -364,7 +364,7 @@ def _run_with_default_deny(tmp_path):
 def _fake_verify_ok(tx, *, expect_from=None, expect_to=None, expect_value=None, **kw):
     """替身：只认签名，不打 RPC。
 
-    **签名必须与 `pactpay.onchain.verify_usdc_transfer` 一致** ——
+    **签名必须与 `pactpay.platform.onchain.verify_usdc_transfer` 一致** ——
     原先这里写的是 `expected_from`，于是真实调用点一接上就抛
     `TypeError`（被 fail-closed 兜住判成"没验成"）。替身签名漂移
     正是"测试钉住了替身、没钉住真实契约"的典型，特意在这里钉死。
@@ -554,7 +554,7 @@ def test_the_fake_verifier_signature_matches_the_real_one():
     """替身与真货的**关键字签名**必须一致。
 
     这条测试是被一个真 bug 逼出来的：`_fake_verify_ok` 原来用 `expected_from`，
-    而 `pactpay.onchain.verify_usdc_transfer` 用的是 `expect_from`。
+    而 `pactpay.platform.onchain.verify_usdc_transfer` 用的是 `expect_from`。
     测试全绿，真实调用点一接上就 `TypeError` —— 被 fail-closed 兜成"没验成"，
     于是 `make verify` 对**每一份真实证据**都判不通过。
 
@@ -562,7 +562,7 @@ def test_the_fake_verifier_signature_matches_the_real_one():
     """
     import inspect
 
-    from pactpay.onchain import verify_usdc_transfer
+    from pactpay.platform.onchain import verify_usdc_transfer
     from pactpay.evidence.verify import onchain_anchor_reason
 
     real = set(inspect.signature(verify_usdc_transfer).parameters)
@@ -809,7 +809,7 @@ def test_latest_run_dir_skips_incomplete_runs(tmp_path):
 
     一次中断的运行会留下一个缺文件的目录；挑到它，"最新证据"就成了一份残骸。
     """
-    from pactpay.dashboard.app import latest_run_dir
+    from pactpay.demo.dashboard.app import latest_run_dir
     from pactpay.evidence import append_record, read_chain, write_anchor, write_counts
 
     older = tmp_path / "run-20260101T000000Z-aaaaaaaa"
@@ -843,8 +843,8 @@ def test_a_forged_audit_row_is_caught_by_the_upstream_recheck(tmp_path, monkeypa
     同时必须有阳性对照，否则"永远判失败"也能让这条测试变绿。
     """
     from pactpay.evidence.verify import verify_audit_rows_upstream
-    import pactpay.cobo as cobo_mod
-    import pactpay.config as config_mod
+    import pactpay.platform.cobo as cobo_mod
+    import pactpay.platform.config as config_mod
 
     monkeypatch.setattr(config_mod, "load_existing", lambda: {"AGENT_WALLET_API_KEY": "k"})
 
@@ -896,7 +896,7 @@ def test_upstream_recheck_fails_closed_when_it_cannot_reach_cobo(monkeypatch):
     ok, why = verify_audit_rows_upstream([], wallet_id="w")
     assert ok is False and "无法做上游复核" in why
 
-    import pactpay.config as config_mod
+    import pactpay.platform.config as config_mod
 
     def _boom():
         raise RuntimeError("network down")
@@ -958,8 +958,8 @@ def test_verify_run_passes_when_upstream_agrees(tmp_path, monkeypatch):
 
 def _fake_cobo_with_pages(monkeypatch, pages, *, wallet_id=None):
     """替身：按 `after` 游标逐页返回，模拟**滚动**的上游审计日志。"""
-    import pactpay.cobo as cobo_mod
-    import pactpay.config as config_mod
+    import pactpay.platform.cobo as cobo_mod
+    import pactpay.platform.config as config_mod
 
     monkeypatch.setattr(config_mod, "load_existing", lambda: {"AGENT_WALLET_API_KEY": "k"})
 

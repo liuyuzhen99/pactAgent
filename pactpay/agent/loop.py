@@ -43,8 +43,8 @@ from typing import Any, Callable
 
 import httpx
 
-from .llm_planner import DEFAULT_BASE_URL, DEFAULT_KEY_PATHS, DEFAULT_MODEL, TIMEOUT_S, LLMError, _read_api_key
-from .tools import SPENDING_TOOLS, TOOL_SCHEMAS, ToolContext, dispatch, to_json
+from pactpay.agent.llm_planner import DEFAULT_BASE_URL, DEFAULT_KEY_PATHS, DEFAULT_MODEL, TIMEOUT_S, LLMError, _read_api_key
+from pactpay.agent.tools import SPENDING_TOOLS, TOOL_SCHEMAS, ToolContext, dispatch, to_json
 
 #: 一次会话最多几步。5 个工具、一次采购任务，20 步绰绰有余；
 #: 超过就是模型卡住了，应当停下而不是继续烧钱。

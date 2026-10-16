@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from pactpay.onchain import TRANSFER_TOPIC, decode_usdc_transfers
+from pactpay.platform.onchain import TRANSFER_TOPIC, decode_usdc_transfers
 
 USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 FROM = "0x1f3963c9ebc26cce128ec00a779a948bcc2f7ffa"
@@ -78,7 +78,7 @@ def test_multiple_transfers_are_all_returned():
 
 
 # ---- B3：`verify_usdc_transfer` 的判定逻辑（评审指出它**零测试**、且从不核对 from）----
-from pactpay.onchain import check_usdc_transfer  # noqa: E402
+from pactpay.platform.onchain import check_usdc_transfer  # noqa: E402
 
 FROM_ADDR = "0x1f3963c9ebc26cce128ec00a779a948bcc2f7ffa"
 OTHER_ADDR = "0x9999999999999999999999999999999999999999"
@@ -204,7 +204,7 @@ def test_count_usdc_transfers_never_raises_anywhere(monkeypatch, where):
     它上面套着 `_safe_count` 兜底没错，但**契约写在 docstring 里就该兑现** ——
     靠调用方兜底意味着"换个调用方就会崩"。这条把 5 个环节逐个逼一遍。
     """
-    from pactpay.onchain import count_usdc_transfers_from
+    from pactpay.platform.onchain import count_usdc_transfers_from
 
     _install_exploding_web3(monkeypatch, where=where)
 
@@ -227,7 +227,7 @@ def test_decoding_is_unaffected_by_the_stub(monkeypatch):
 
     没有这一条，上面那组测试可能只是"函数永远返回 ok=False"。
     """
-    from pactpay.onchain import decode_usdc_transfers
+    from pactpay.platform.onchain import decode_usdc_transfers
 
     _install_exploding_web3(monkeypatch, where="get_logs")
 
@@ -245,7 +245,7 @@ def test_a_window_entirely_beyond_the_chain_head_is_inconclusive(monkeypatch):
     所以"数到 0 笔"不是"没有转账"，而是"**根本没有数据可数**"。
     把"没测"当成"测了而且没有"，正是本项目反复被抓的那一类假绿灯。
     """
-    import pactpay.onchain as onchain
+    import pactpay.platform.onchain as onchain
 
     class _Eth:
         block_number = 100
@@ -304,7 +304,7 @@ class _FakeEth:
 def _verified_with(monkeypatch, receipt, *, transfers):
     """把 `web3.Web3` **整个**换成替身（`verify_usdc_transfer` 是函数内 import，所以打这里）。"""
     import web3
-    import pactpay.onchain as onchain_mod
+    import pactpay.platform.onchain as onchain_mod
 
     class _FakeWeb3:
         def __init__(self, *a, **k):

@@ -10,7 +10,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from pactpay.config import CHAIN_ID, TOKEN_ID
+from pactpay.platform.config import CHAIN_ID, TOKEN_ID
 
 #: A0e 探针用的单笔上限：只够付一次 /api/cheap（0.005）。
 X402_CAP = "0.01"

@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-DEMO = REPO / "pactpay" / "demo.py"
+DEMO = REPO / "pactpay" / "demo" / "run.py"
 
 
 @pytest.fixture(scope="module")
@@ -74,7 +74,7 @@ def test_the_budget_is_the_story_number():
     """总预算必须就是故事里那个数（0.1 USDC）。"""
     from decimal import Decimal
 
-    from pactpay.demo import BUDGET_USD
+    from pactpay.demo.run import BUDGET_USD
 
     assert BUDGET_USD == Decimal("0.1")
 
@@ -86,8 +86,8 @@ def test_the_expensive_purchase_is_actually_over_the_cap(demo_tree: ast.Module):
     反过来，如果上限被改大，它就不会被拒。两边必须对得上，
     所以这里检查的是**关系**：至少有一笔计划金额 > 单笔上限。
     """
-    from pactpay.demo import BUDGET_USD, PER_TX_CAP, TASK
-    from pactpay.planner import make_plan
+    from pactpay.demo.run import BUDGET_USD, PER_TX_CAP, TASK
+    from pactpay.agent.planner import make_plan
 
     plan = make_plan(TASK, BUDGET_USD)
     cap = float(PER_TX_CAP)
@@ -107,8 +107,8 @@ def test_expected_spend_is_the_cheap_purchase():
     """
     from decimal import Decimal
 
-    from pactpay.demo import BUDGET_USD, PER_TX_CAP, TASK, planned_spend
-    from pactpay.planner import make_plan
+    from pactpay.demo.run import BUDGET_USD, PER_TX_CAP, TASK, planned_spend
+    from pactpay.agent.planner import make_plan
 
     affordable = [
         p for p in make_plan(TASK, BUDGET_USD).purchases if float(p.amount_usd) <= float(PER_TX_CAP)
@@ -185,7 +185,7 @@ def test_payment_response_is_never_labelled_as_an_audit_log():
     评审把 x402 那条的来源标签改成「Cobo 审计日志（不可篡改）」，254 条全绿 ——
     于是一句谎言会印在页面上。
     """
-    from pactpay.dashboard.app import SOURCE_LABELS
+    from pactpay.demo.dashboard.app import SOURCE_LABELS
 
     payment_label = SOURCE_LABELS["cobo_payment_response"]
 
@@ -204,7 +204,7 @@ def test_payment_response_is_never_labelled_as_an_audit_log():
 
 def test_the_x402_denial_is_sourced_from_the_payment_response():
     """x402 那条拒绝的来源必须标成**付款响应**，不是审计日志。"""
-    from pactpay.dashboard.app import SOURCE_LABELS, denial_evidence_source
+    from pactpay.demo.dashboard.app import SOURCE_LABELS, denial_evidence_source
 
     denial = {"code": "X402_POLICY_DENIED", "policy_reason": "matched_pact_transfer_deny_if"}
 
@@ -219,7 +219,7 @@ def test_the_x402_denial_is_sourced_from_the_payment_response():
 
 def test_audit_backed_denial_is_labelled_as_audit_log():
     """**阳性对照**：真有审计行的转账拒绝，才该标成审计日志。"""
-    from pactpay.dashboard.app import SOURCE_LABELS, denial_evidence_source
+    from pactpay.demo.dashboard.app import SOURCE_LABELS, denial_evidence_source
 
     denial = {
         "code": "ADDRESS_NOT_WHITELISTED",

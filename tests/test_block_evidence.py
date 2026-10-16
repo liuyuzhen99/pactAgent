@@ -16,12 +16,12 @@ from decimal import Decimal
 
 import pytest
 
-from pactpay.block_evidence import check_no_onchain_transfer
+from pactpay.evidence.block import check_no_onchain_transfer
 
 
 # ---- A5c② 审计佐证：**只对转账路径可用** ----
 
-from pactpay.block_evidence import audit_corroboration  # noqa: E402
+from pactpay.evidence.block import audit_corroboration  # noqa: E402
 
 TRANSFER_DENIED_ROW = {
     "id": 926193,
@@ -78,8 +78,8 @@ def test_audit_corroboration_ignores_rows_outside_the_run_window():
 
 # ---- A5c② 需要一个"命中规则"的拒绝：fail-closed 那条**本来就没有 policy_id** ----
 
-from pactpay.block_evidence import probe_matched_rule_denial  # noqa: E402
-from pactpay.cobo import PolicyDenied  # noqa: E402
+from pactpay.evidence.block import probe_matched_rule_denial  # noqa: E402
+from pactpay.platform.cobo import PolicyDenied  # noqa: E402
 
 
 class _FakeClient:
@@ -144,7 +144,7 @@ def test_probe_raises_if_the_over_cap_transfer_unexpectedly_succeeds():
 
 # ---- 实测发现：审计日志有**写入延迟**，必须轮询 ----
 
-from pactpay.block_evidence import wait_for_audit_corroboration  # noqa: E402
+from pactpay.evidence.block import wait_for_audit_corroboration  # noqa: E402
 
 
 class _FakeAuditClient:
@@ -249,7 +249,7 @@ def test_a_matching_row_without_policy_id_is_reported_not_accepted():
 #   ② 写进 run.json 的 `no_chain_trace` 是"存在结构化拒绝"的**派生布尔**，不是测量值；
 #   ③ `policy_id` 在字典字面量里**出现两次**，后者覆盖前者，
 #      把 A5a 要的"拒绝响应 policy_id == 审计行 policy_id"三方交叉**在产物里销毁了**。
-from pactpay.block_evidence import summarize_a5c  # noqa: E402
+from pactpay.evidence.block import summarize_a5c  # noqa: E402
 
 X402_DENIED = {
     "http_status": 422,
@@ -347,8 +347,8 @@ def test_outcome_to_a5c_shape_pulls_the_code_out_of_the_nested_denial():
     """
     from decimal import Decimal
 
-    from pactpay.agent import PurchaseOutcome
-    from pactpay.block_evidence import outcome_to_a5c_shape
+    from pactpay.agent.pay import PurchaseOutcome
+    from pactpay.evidence.block import outcome_to_a5c_shape
 
     outcome = PurchaseOutcome(
         resource="/api/premium",
@@ -373,8 +373,8 @@ def test_outcome_to_a5c_shape_keeps_a_paid_outcome_free_of_denial_data():
     """成功那笔没有 denial，转换后 `code` 必须是 None 而**不是崩掉或编一个**。"""
     from decimal import Decimal
 
-    from pactpay.agent import PurchaseOutcome
-    from pactpay.block_evidence import outcome_to_a5c_shape
+    from pactpay.agent.pay import PurchaseOutcome
+    from pactpay.evidence.block import outcome_to_a5c_shape
 
     paid = PurchaseOutcome(
         resource="/api/cheap", amount_usd=Decimal("0.005"), description="原始运营数据",
@@ -500,8 +500,8 @@ def test_the_check_is_sensitive_to_the_subject_address():
 
 # ---- N3/M4：A4 守卫的**行为**测试（原先零覆盖，改回逃逸写法全绿）----
 
-from pactpay.agent import PurchaseOutcome  # noqa: E402
-from pactpay.block_evidence import judge_paid_requires_onchain  # noqa: E402
+from pactpay.agent.pay import PurchaseOutcome  # noqa: E402
+from pactpay.evidence.block import judge_paid_requires_onchain  # noqa: E402
 
 
 def _paid(tx: str | None) -> PurchaseOutcome:
@@ -578,7 +578,7 @@ def test_failed_outcome_is_exactly_the_string_failed():
     在**用户可见的结论上是相反的**——前者"钱可能动了"，后者"钱没动"。
     把字面量写错，看板就会把基础设施故障读成"边界生效"。
     """
-    from pactpay.agent import _not_settled
+    from pactpay.agent.pay import _not_settled
 
     class _Resp:
         status_code = 500
@@ -594,7 +594,7 @@ def test_failed_outcome_is_exactly_the_string_failed():
 
 # ---- N6：`snapshot_wallet` 的度量来源原先零测试（M30 恒返回 0/0 不可见）----
 
-from pactpay.block_evidence import snapshot_wallet  # noqa: E402
+from pactpay.evidence.block import snapshot_wallet  # noqa: E402
 
 
 class _FakeWalletClient:
@@ -837,7 +837,7 @@ def test_a_hardcoded_constant_cannot_stand_in_for_a_measurement():
     """**G3 的核心回归测试**：伪造的"测量结果"必须当场炸，绝不许渲染成 ✅。"""
     import pytest
 
-    from pactpay.block_evidence import summarize_a5c
+    from pactpay.evidence.block import summarize_a5c
 
     with pytest.raises(ValueError, match="缺少测量字段"):
         summarize_a5c(X402_DENIED, MATCHED, CORROBORATION, TRACE, {"ok": True, "why": "硬编码"})
@@ -851,7 +851,7 @@ def test_a_fake_ok_without_a_real_positive_control_is_rejected():
     """
     import pytest
 
-    from pactpay.block_evidence import summarize_a5c
+    from pactpay.evidence.block import summarize_a5c
 
     fake = {"ok": True, "verdict": "no_trace", "why": "我说的", "count": 0, "control_count": None}
     with pytest.raises(ValueError, match="阳性对照"):
@@ -862,7 +862,7 @@ def test_an_illegal_verdict_is_rejected():
     """`verdict` 只能是 {ok, inconclusive} —— 编一个别的值也不算测量。"""
     import pytest
 
-    from pactpay.block_evidence import summarize_a5c
+    from pactpay.evidence.block import summarize_a5c
 
     with pytest.raises(ValueError, match="verdict"):
         summarize_a5c(
@@ -877,7 +877,7 @@ def test_a_missing_measurement_is_false_not_a_crash():
     两者混为一谈会把"没测"变成崩溃，也会把"伪造"变成安静的 False ——
     两种都是错的。所以 `None` 走 False，一个**不是测量结果的东西**才炸。
     """
-    from pactpay.block_evidence import summarize_a5c
+    from pactpay.evidence.block import summarize_a5c
 
     summary = summarize_a5c(X402_DENIED, MATCHED, CORROBORATION, TRACE, None)
 
@@ -961,9 +961,9 @@ def test_the_window_adapter_actually_queries_the_whole_window():
     """
     from unittest import mock
 
-    from pactpay.block_evidence import count_transfers_in_window
+    from pactpay.evidence.block import count_transfers_in_window
 
-    with mock.patch("pactpay.onchain.count_usdc_transfers_from") as fake:
+    with mock.patch("pactpay.platform.onchain.count_usdc_transfers_from") as fake:
         fake.return_value = {"ok": True, "count": 0}
         count_transfers_in_window("0xABC", 200, 210)
 
@@ -977,7 +977,7 @@ def test_the_legal_verdict_list_matches_what_the_checker_actually_returns():
     `no_trace` / `trace_found` / `inconclusive` —— 于是**真跑起来**守卫把自己人拦下了
     （单元测试全绿，因为测试里喂的是手写的假 trace）。清单必须与实现同源。
     """
-    from pactpay.block_evidence import VERDICT_INCONCLUSIVE, VERDICT_NO_TRACE, VERDICT_TRACE_FOUND
+    from pactpay.evidence.block import VERDICT_INCONCLUSIVE, VERDICT_NO_TRACE, VERDICT_TRACE_FOUND
 
     produced = set()
     # 走遍每一条返回分支
@@ -1031,7 +1031,7 @@ def test_measurement_window_is_built_from_the_sampled_blocks():
     （窗口整体挪到**尝试之后**，等于没测），292 条测试全绿。现在窗口由
     `build_measurement_window` 自己造，这条测试钉住它。
     """
-    from pactpay.block_evidence import build_measurement_window
+    from pactpay.evidence.block import build_measurement_window
 
     window, control, why = build_measurement_window(block_before=100, block_after=105, control_block=99)
     assert why == ""
@@ -1041,7 +1041,7 @@ def test_measurement_window_is_built_from_the_sampled_blocks():
 
 def test_measurement_window_rejects_a_zero_width_or_shifted_window():
     """宽度 0 / 挪到尝试之后 / 对照区块没早于窗口 —— 三种形状都必须被拒（返回空窗口）。"""
-    from pactpay.block_evidence import build_measurement_window
+    from pactpay.evidence.block import build_measurement_window
 
     # 宽度 0：采样没跨过那次尝试
     window, _, why = build_measurement_window(block_before=100, block_after=100, control_block=99)
@@ -1062,7 +1062,7 @@ def test_measurement_window_rejects_a_zero_width_or_shifted_window():
 
 def test_a_rejected_window_makes_the_check_inconclusive_not_a_pass():
     """窗口不合法 ⇒ 结论必须是 `inconclusive`（不给 ✅），**不是**通过。"""
-    from pactpay.block_evidence import build_measurement_window
+    from pactpay.evidence.block import build_measurement_window
 
     _, _, why = build_measurement_window(block_before=100, block_after=100, control_block=99)
     result = check_no_onchain_transfer(

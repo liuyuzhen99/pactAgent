@@ -19,9 +19,9 @@ from typing import Any
 
 import httpx
 
-from pactpay.cobo import CoboClient, PolicyDenied
-from pactpay.payee_lifecycle import ensure_payee
-from pactpay.config import CHAIN_ID as _CHAIN_ID, TOKEN_ID as _TOKEN_ID, load_existing
+from pactpay.platform.cobo import CoboClient, PolicyDenied
+from pactpay.demo.payee_lifecycle import ensure_payee
+from pactpay.platform.config import CHAIN_ID as _CHAIN_ID, TOKEN_ID as _TOKEN_ID, load_existing
 
 CHAIN_ID = _CHAIN_ID
 TOKEN_ID = _TOKEN_ID

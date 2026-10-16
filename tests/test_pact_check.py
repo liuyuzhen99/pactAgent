@@ -17,7 +17,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
-from pactpay.pact_check import compare_spec
+from pactpay.policy.check import compare_spec
 
 SUBMITTED = {
     "policies": [
@@ -143,7 +143,7 @@ def test_a_wholly_missing_key_is_caught():
 
 # ---- A1 第三个断言：必须是 pact-scoped key ----
 
-from pactpay.pact_check import pact_key_is_scoped  # noqa: E402
+from pactpay.policy.check import pact_key_is_scoped  # noqa: E402
 
 
 def test_scoped_key_must_differ_from_the_root_key():
@@ -166,7 +166,7 @@ def test_a_missing_key_is_not_accepted():
 # `make pact` 照样打印「✓ A1 成立」并且**退出码 0**。
 # 也就是说"规则挂在了一个还没生效的 Pact 上"，而演示一切正常 —— 典型静默失败。
 # 触发条件真实存在：agent 一旦被配对（pairing），Pact 就不再自动 ACTIVE，而是等人审批。
-from pactpay.pact_check import judge_readback  # noqa: E402
+from pactpay.policy.check import judge_readback  # noqa: E402
 
 B4_SUBMITTED = {
     "policies": [{"name": "p", "type": "transfer", "rules": {"effect": "allow", "when": {"chain_in": ["TBASE_SETH"]}}}],
@@ -244,7 +244,7 @@ def test_a_non_active_pact_makes_the_verdict_fail():
     Pact 不在 `active` 时，限额/白名单**根本没生效** —— 后面每一句"被拒"
     都可能只是预算到期，而不是边界起作用。整个 A1 结论都不成立。
     """
-    from pactpay.pact_check import judge_a1
+    from pactpay.policy.check import judge_a1
 
     verdict = judge_a1(active=False, readback_ok=True, scoped=True)
 
@@ -258,7 +258,7 @@ def test_a_non_active_pact_makes_the_verdict_fail():
 
 def test_an_unscoped_key_makes_the_verdict_fail():
     """执行用的钥匙必须**被 Pact 约束住**，否则限额是写在纸上的。"""
-    from pactpay.pact_check import judge_a1
+    from pactpay.policy.check import judge_a1
 
     verdict = judge_a1(active=True, readback_ok=True, scoped=False)
 
@@ -268,7 +268,7 @@ def test_an_unscoped_key_makes_the_verdict_fail():
 
 def test_a_readback_mismatch_makes_the_verdict_fail():
     """回读不一致（策略被服务端改过）⇒ 必须失败。"""
-    from pactpay.pact_check import judge_a1
+    from pactpay.policy.check import judge_a1
 
     verdict = judge_a1(active=True, readback_ok=False, scoped=True)
 
@@ -281,7 +281,7 @@ def test_a1_passes_only_when_all_three_hold():
 
     没有这一条，上面三条可能只是"永远返回失败"。
     """
-    from pactpay.pact_check import judge_a1
+    from pactpay.policy.check import judge_a1
 
     verdict = judge_a1(active=True, readback_ok=True, scoped=True)
 
@@ -294,7 +294,7 @@ def test_main_actually_routes_the_verdict_into_its_exit_code():
 
     评审 F1 的教训：**函数改对了、调用处没改**照样全绿。
     """
-    src = (REPO / "pactpay" / "pact_check.py").read_text()
+    src = (REPO / "pactpay" / "policy" / "check.py").read_text()
     tree = ast.parse(src)
     main_fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "main")
     joined = ast.unparse(main_fn)

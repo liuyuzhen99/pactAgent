@@ -24,8 +24,8 @@ from typing import Any, Callable
 
 import httpx
 
-from pactpay.cobo import CoboClient, CoboError, PolicyDenied
-from pactpay.planner import Purchase
+from pactpay.platform.cobo import CoboClient, CoboError, PolicyDenied
+from pactpay.agent.planner import Purchase
 
 HTTP_TIMEOUT_S = 30
 

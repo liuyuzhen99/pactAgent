@@ -279,35 +279,51 @@ make revoke-check    # 撤销 Pact → 立刻重试同一笔 → 确认被拒
 ## 目录结构
 
 ```
-pactpay/
-  config.py            链/代币标识 + .env 凭证读写（底层，探针与生产命令共用）
-  pact_spec.py         PactSpec 构造函数（策略 + 完成条件）
-  cobo.py              Cobo Agentic Wallet 的薄封装（REST）
-  planner.py           Agent 的采购计划接口（Purchase/Plan + 确定性实现，签名固定、实现可换）
-  llm_planner.py       **Agent 的大脑**：DeepSeek 自己决定买哪几个接口（prompt 里不给单笔上限）
-  tools.py             Agent 能调用的工具（查目录/查余额/购买/记账/交付）—— 花钱只有 purchase 一个口
-  agent_loop.py        **Agent 主循环**：模型每一步自己调工具、看结果、再决定下一步
-  agent_run.py         `make agent` 的入口：跑一轮自主采购，把工具流水写进证据
-  agent.py             x402 采购执行；拒绝归一化（denied / failed 分开）
-  preconditions.py     运行前置检查（余额不足时明确报错，不许跑出残缺证据）
-  pact_check.py        Pact 提交与回读一致 + status 生效检查（make pact）
-  block_evidence.py    签名前拦截的三重证据（结构化拒绝/审计佐证/无链上痕迹）
-  onchain.py           Base Sepolia RPC 复核：解 USDC Transfer 事件、核对 from/to/value
-  cumulative_check.py  累计上限拒绝检查（make cumulative-check）
-  complete_check.py    完成条件（tx_count/time_elapsed/amount_spent）检查（make complete-check）
-  revoke_check.py      撤销 Pact → 同一 key 立刻失效（make revoke-check，零成本）
-  event_watch.py       实时告警通道检查：SSE 不可用时如实说明并退回轮询（make events）
-  demo.py              演示主流程（make demo）
-  payee/app.py         收款方：两个付费 API（make payee）
-  payee_lifecycle.py   一条命令里自起自停收款方
-  dashboard/app.py     证据展示页（make dashboard）
-  evidence/            证据落盘、计数与校验（make verify）
-  spike/
-    t0_probe.py        T0 探针：凭证/钱包/地址 + 超限拒绝（零资金可跑）
-    a0e_probe.py       A0e 探针：x402 付款全链路 + 链上复核
-tests/                 单测：含策略判据、AST 结构守卫、损坏容忍、变异自检清单
-evidence/              每次运行的证据（不进 git）
-progress/              开发进度账本（不进 git）
+pactpay/                    按职责分子包，目录名就是职责
+  platform/                 平台与链的底层：不掺业务判断
+    config.py                 链/代币标识 + .env 凭证读写（标识只定义这一次）
+    cobo.py                   Cobo Agentic Wallet 的薄封装（REST，手写）
+    onchain.py                Base Sepolia RPC 读链：解 USDC Transfer、核对 from/to/value
+
+  policy/                   人类划的边界
+    spec.py                   PactSpec 构造（策略 + 完成条件）
+    check.py                  Pact 提交与回读一致 + status 生效检查（make pact）
+
+  agent/                    Agent 自己：决策 + 执行
+    loop.py                   **主循环**：模型每一步自己调工具、看结果、再决定下一步
+    tools.py                  模型能调的 5 个工具 —— 花钱只有 purchase 一个口
+    planner.py                采购计划接口（签名固定、实现可换）
+    llm_planner.py            **大脑**：DeepSeek 决定买哪几个（prompt 里不给单笔上限）
+    run.py                    make agent 入口：跑一轮自主采购，工具流水写进证据
+    pay.py                    x402 采购执行 + 重试（复用同一 request_id）
+    preconditions.py          花钱前的余额检查（不许跑出残缺证据）
+
+  evidence/                 留下能核对的东西
+    __init__.py               哈希链 / 计数 / 锚 / 记录构造
+    verify.py                 make verify：链 + 锚 + 链上对账 + 上游复核
+    block.py                  签名前拦截的三重证据（结构化拒绝/审计佐证/无链上痕迹）
+
+  governance/               人类收权的通道（都在平台侧，Agent 绕不过）
+    revoke.py                 make revoke-check：撤销后同一 key 立刻失效
+    events.py                 make events：实时告警通道检查（SSE 不可用则退回轮询）
+
+  checks/                   独立探针式检查（各建一份临时 Pact）
+    complete.py               完成条件自动终止（make complete-check）
+    cumulative.py             24h 累计上限被触发（make cumulative-check）
+
+  demo/                     给人看的那一层
+    run.py                    make demo 主流程
+    payee_lifecycle.py        一条命令里自起自停收款方
+    demo/payee/app.py         收款方：两个付费 API（make payee）
+    demo/dashboard/app.py     证据展示页（make dashboard）
+
+  spike/                    零资金可行性探针
+    t0_probe.py               凭证/钱包/地址 + 超限拒绝
+    a0e_probe.py              x402 付款全链路
+
+tests/                      单测：策略判据、AST 结构守卫、损坏容忍、变异自检清单
+evidence/                   每次运行的证据（不进 git）
+progress/                   开发进度账本（不进 git）
 ```
 
 ---

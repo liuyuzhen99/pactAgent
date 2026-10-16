@@ -427,7 +427,7 @@ app = create_app()
 
 
 def _latest_run_cli() -> int:
-    """`python -m pactpay.dashboard.app --latest-run`：打印最近一次**完整**运行的目录。
+    """`python -m pactpay.demo.dashboard.app --latest-run`：打印最近一次**完整**运行的目录。
 
     存在的理由（评审第 4 轮 F8）：`make verify` 与看板必须对"最新一次运行"
     有**同一个**理解。原先 Makefile 自己写了一句 `[ -f run.json ]`，
@@ -448,4 +448,4 @@ if __name__ == "__main__":  # pragma: no cover - CLI 入口
 
     if "--latest-run" in sys.argv:
         raise SystemExit(_latest_run_cli())
-    raise SystemExit("用法：python -m pactpay.dashboard.app --latest-run（或用 make dashboard 起服务）")
+    raise SystemExit("用法：python -m pactpay.demo.dashboard.app --latest-run（或用 make dashboard 起服务）")

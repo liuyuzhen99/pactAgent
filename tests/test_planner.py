@@ -13,7 +13,7 @@ from decimal import Decimal
 
 import pytest
 
-from pactpay.planner import Purchase, default_planner, make_plan, usd_to_atomic
+from pactpay.agent.planner import Purchase, default_planner, make_plan, usd_to_atomic
 
 TASK = "帮我买一份数据报告"
 BUDGET = Decimal("0.1")

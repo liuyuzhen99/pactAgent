@@ -37,10 +37,10 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Callable
 
-from .agent import PurchaseOutcome, buy
-from .cobo import CoboClient
-from .llm_planner import API_CATALOG
-from .planner import Purchase
+from pactpay.agent.pay import PurchaseOutcome, buy
+from pactpay.platform.cobo import CoboClient
+from pactpay.agent.llm_planner import API_CATALOG
+from pactpay.agent.planner import Purchase
 
 #: Agent 能看见的接口清单（资源 → 价格/描述）。价格是**本地权威**，
 #: 不问模型、也不问收款方——收款方报价和标价不一致时以本地清单为准并报错。
@@ -109,8 +109,8 @@ def tool_list_catalog(ctx: ToolContext) -> dict[str, Any]:
 
 def tool_check_balance(ctx: ToolContext) -> dict[str, Any]:
     """查钱包余额（只读）。"""
-    from .config import CHAIN_ID, TOKEN_ID
-    from .preconditions import find_balance
+    from pactpay.platform.config import CHAIN_ID, TOKEN_ID
+    from pactpay.agent.preconditions import find_balance
 
     balances = ctx.client.list_balances(ctx.wallet_uuid, chain_id=CHAIN_ID, token_id=TOKEN_ID)
     found = find_balance(balances.get("result") or [], CHAIN_ID, TOKEN_ID) or {}

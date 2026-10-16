@@ -114,8 +114,8 @@ def verify_audit_rows_upstream(
     # 实测：27 个真实 run 里 **25 个**因此被误判成"审计行被改过或删过"，
     # 1250 行诚实证据被指控成伪造。**一个会诬告好证据的检查，比没有检查更糟。**
     try:
-        from pactpay.config import load_existing
-        from pactpay.cobo import CoboClient
+        from pactpay.platform.config import load_existing
+        from pactpay.platform.cobo import CoboClient
 
         api_key = load_existing().get("AGENT_WALLET_API_KEY", "")
         if not api_key:
@@ -410,7 +410,7 @@ def onchain_anchor_reason(record: dict[str, Any], *, verify_fn: Any = None) -> t
     if not tx:
         return False, "paid 记录没有 settlement_tx ⇒ 无法锚定到链上（这一条可能被擦改过）"
     if verify_fn is None:
-        from pactpay.onchain import verify_usdc_transfer  # 延迟导入：离线跑 verify 时不拖 RPC 依赖
+        from pactpay.platform.onchain import verify_usdc_transfer  # 延迟导入：离线跑 verify 时不拖 RPC 依赖
 
         verify_fn = verify_usdc_transfer
     try:
@@ -471,7 +471,7 @@ def reconcile_with_chain(
     `count_fn` 是注入口子（测试用），签名同 `onchain.count_usdc_transfers_from`。
     """
     if count_fn is None:
-        from pactpay.onchain import count_usdc_transfers_from
+        from pactpay.platform.onchain import count_usdc_transfers_from
 
         count_fn = count_usdc_transfers_from
 

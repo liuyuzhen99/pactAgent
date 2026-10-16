@@ -39,7 +39,7 @@ from typing import Any, Callable
 
 import httpx
 
-from .planner import Purchase
+from pactpay.agent.planner import Purchase
 
 #: DeepSeek 的 chat completions 端点。可用 `DEEPSEEK_BASE_URL` 覆盖。
 DEFAULT_BASE_URL = "https://api.deepseek.com"

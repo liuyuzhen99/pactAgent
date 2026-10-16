@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from pactpay.llm_planner import (
+from pactpay.agent.llm_planner import (
     API_CATALOG,
     LLMError,
     build_prompt,
@@ -165,7 +165,7 @@ def test_catalog_prices_are_the_real_ones():
 
 def test_catalog_matches_the_payee_routes():
     """清单和收款方的真实路由必须一一对应（少一个多一个都是漂移）。"""
-    from pactpay.payee.app import REPORTS
+    from pactpay.demo.payee.app import REPORTS
 
     # 收款方那边的键带方法前缀（"GET /api/cheap"），planner 侧只用路径
     payee_paths = sorted(key.split(" ", 1)[1] for key in REPORTS)
@@ -207,7 +207,7 @@ def test_replan_feedback_does_not_mention_the_pact_cap():
 
     否则等于在教模型避开那笔超限采购 —— 边界被触发的那一幕就成了我们安排的。
     """
-    from pactpay.llm_planner import build_replan_prompt
+    from pactpay.agent.llm_planner import build_replan_prompt
 
     prompt = build_replan_prompt("任务", BUDGET, ("原始运营数据",))
 
@@ -240,7 +240,7 @@ def test_a_complete_first_plan_does_not_replan():
 
 def test_deliverables_point_at_real_catalog_entries():
     """交付要点指向的接口必须在清单里 —— 否则重规划永远不可能成功。"""
-    from pactpay.llm_planner import DELIVERABLES
+    from pactpay.agent.llm_planner import DELIVERABLES
 
     catalog = {item["resource"] for item in API_CATALOG}
     for label, resource in DELIVERABLES:

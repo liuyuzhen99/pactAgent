@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from pactpay.complete_check import (
+from pactpay.checks.complete import (
     EXPECTED_EXHAUSTED_CODE,
     build_one_shot_pact_spec,
     classify_after_completion,
@@ -66,7 +66,7 @@ def test_other_errors_are_not_counted_as_invalidation():
 # 变成**实测**，并覆盖 demo Pact 真正在用的那种完成条件类型；实现里只有 `tx_count`，
 # 全仓 `grep EXPIRED` 为 0，却记成"6 项缺口全部关闭"。
 # R10 列了三种完成条件（累计花费 / 交易次数 / 时间到期），只验一种不算覆盖。
-from pactpay.complete_check import (  # noqa: E402
+from pactpay.checks.complete import (  # noqa: E402
     build_amount_spent_pact_spec,
     build_time_elapsed_pact_spec,
 )
@@ -120,7 +120,7 @@ def test_the_probe_constants_themselves_are_pinned():
     "把默认值 `TIME_ELAPSED_SECONDS` 改错"——因为测试显式传了参数，默认值根本没被走到。
     这类"默认值漂了但测试全绿"的洞，只有直接断言默认值才堵得住。
     """
-    from pactpay.complete_check import (
+    from pactpay.checks.complete import (
         AMOUNT_SPENT_THRESHOLD,
         TIME_ELAPSED_SECONDS,
     )
@@ -148,7 +148,7 @@ def test_time_elapsed_expected_status_is_the_measured_one():
     """
     import inspect
 
-    from pactpay import complete_check
+    from pactpay.checks import complete as complete_check
 
     source = inspect.getsource(complete_check._run)
     assert 'label="time-elapsed"' in source
@@ -158,7 +158,7 @@ def test_time_elapsed_expected_status_is_the_measured_one():
 
 # ---- M17/M31：探针的结论到底算不算数（原先聚合内联在 main 里，改成 False 全绿）----
 
-from pactpay.complete_check import aggregate_exit_code  # noqa: E402
+from pactpay.checks.complete import aggregate_exit_code  # noqa: E402
 
 
 def test_a_failed_probe_makes_the_whole_check_fail(capsys):

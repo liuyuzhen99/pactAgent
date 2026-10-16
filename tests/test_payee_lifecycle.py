@@ -8,13 +8,13 @@
 from __future__ import annotations
 
 
-from pactpay.payee_lifecycle import ensure_payee, is_payee_up
+from pactpay.demo.payee_lifecycle import ensure_payee, is_payee_up
 
 
 
 def test_reports_up_when_health_says_ok(monkeypatch):
     monkeypatch.setattr(
-        "pactpay.payee_lifecycle.httpx.get",
+        "pactpay.demo.payee_lifecycle.httpx.get",
         lambda url, timeout=None, **kw: type("R", (), {"status_code": 200, "json": lambda s: {"status": "ok"}})(),
     )
 
@@ -25,7 +25,7 @@ def test_reports_down_when_connection_refused(monkeypatch):
     def boom(url, timeout=None, **kw):
         raise ConnectionError("refused")
 
-    monkeypatch.setattr("pactpay.payee_lifecycle.httpx.get", boom)
+    monkeypatch.setattr("pactpay.demo.payee_lifecycle.httpx.get", boom)
 
     assert is_payee_up("http://127.0.0.1:8001") is False
 
@@ -33,7 +33,7 @@ def test_reports_down_when_connection_refused(monkeypatch):
 def test_reports_down_when_health_is_not_ok(monkeypatch):
     """/health 回 200 但 `status != "ok"` 也算没起来——不能只看状态码。"""
     monkeypatch.setattr(
-        "pactpay.payee_lifecycle.httpx.get",
+        "pactpay.demo.payee_lifecycle.httpx.get",
         lambda url, timeout=None, **kw: type("R", (), {"status_code": 200, "json": lambda s: {"status": "starting"}})(),
     )
 
@@ -42,9 +42,9 @@ def test_reports_down_when_health_is_not_ok(monkeypatch):
 
 def test_ensure_payee_reuses_an_already_running_payee(monkeypatch):
     """已经起着就**不要**再起一个（否则端口冲突，演示直接挂）。"""
-    monkeypatch.setattr("pactpay.payee_lifecycle.is_payee_up", lambda base, **kw: True)
+    monkeypatch.setattr("pactpay.demo.payee_lifecycle.is_payee_up", lambda base, **kw: True)
     started = []
-    monkeypatch.setattr("pactpay.payee_lifecycle._spawn", lambda *a, **kw: started.append(1))
+    monkeypatch.setattr("pactpay.demo.payee_lifecycle._spawn", lambda *a, **kw: started.append(1))
 
     proc = ensure_payee("http://127.0.0.1:8001")
 
@@ -54,9 +54,9 @@ def test_ensure_payee_reuses_an_already_running_payee(monkeypatch):
 
 def test_ensure_payee_raises_when_the_new_payee_never_becomes_healthy(monkeypatch):
     """起不来就必须**明确报错**，不能带着一个连不上的收款方继续跑。"""
-    monkeypatch.setattr("pactpay.payee_lifecycle.is_payee_up", lambda base, **kw: False)
-    monkeypatch.setattr("pactpay.payee_lifecycle._spawn", lambda *a, **kw: type("P", (), {"terminate": lambda s: None, "wait": lambda s, timeout=None: 0})())
-    monkeypatch.setattr("pactpay.payee_lifecycle.time.sleep", lambda s: None)
+    monkeypatch.setattr("pactpay.demo.payee_lifecycle.is_payee_up", lambda base, **kw: False)
+    monkeypatch.setattr("pactpay.demo.payee_lifecycle._spawn", lambda *a, **kw: type("P", (), {"terminate": lambda s: None, "wait": lambda s, timeout=None: 0})())
+    monkeypatch.setattr("pactpay.demo.payee_lifecycle.time.sleep", lambda s: None)
 
     import pytest
     with pytest.raises(RuntimeError, match="收款方"):

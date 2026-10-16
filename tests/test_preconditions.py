@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from pactpay.preconditions import PreconditionError, available_atomic, require_balance
+from pactpay.agent.preconditions import PreconditionError, available_atomic, require_balance
 
 REAL_BALANCES = [
     {

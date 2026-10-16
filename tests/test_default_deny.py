@@ -14,8 +14,8 @@ fail-closed 的默认拒绝先生效。
 
 from __future__ import annotations
 
-from pactpay.agent import normalize_transfer_denial
-from pactpay.cobo import PolicyDenied
+from pactpay.agent.pay import normalize_transfer_denial
+from pactpay.platform.cobo import PolicyDenied
 
 # 实测逐字抄录：向白名单外地址转账 0.001 的拒绝
 REAL_DEFAULT_DENY = PolicyDenied(
@@ -90,7 +90,7 @@ class FakeClient:
 
 
 def _probe(client):
-    from pactpay.agent import probe_default_deny
+    from pactpay.agent.pay import probe_default_deny
 
     return probe_default_deny(
         client,

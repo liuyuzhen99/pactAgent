@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from pactpay.dashboard.app import _render, build_view_model, create_app, latest_run_dir
+from pactpay.demo.dashboard.app import _render, build_view_model, create_app, latest_run_dir
 from pactpay.evidence import append_record
 
 EVIDENCE = {
@@ -631,7 +631,7 @@ def test_an_unknown_outcome_is_never_rendered_as_a_policy_denial(tmp_path):
     （`error` / `timeout` / …），看板会把一次基础设施故障说成"边界生效"，
     正好把这个项目要证明的事**说反**。
     """
-    from pactpay.dashboard.app import create_app
+    from pactpay.demo.dashboard.app import create_app
 
     run_dir = _write_run(
         tmp_path,
@@ -800,8 +800,8 @@ def test_the_evidence_record_carries_its_api_path():
 
     这是上一条测试的前提：没有 `api` 字段，匹配就只能回去猜 reason 字符串。
     """
-    from pactpay.agent import normalize_transfer_denial
-    from pactpay.cobo import PolicyDenied
+    from pactpay.agent.pay import normalize_transfer_denial
+    from pactpay.platform.cobo import PolicyDenied
 
     denied = PolicyDenied(
         status=403,

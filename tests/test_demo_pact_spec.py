@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-from pactpay.demo import ROLLING_24H_CAP, build_demo_pact_spec
+from pactpay.demo.run import ROLLING_24H_CAP, build_demo_pact_spec
 
 PAY_TO = "0x757868baab9ab42a20d0ed2d8ffcff9c6df82ea7"
 
@@ -29,7 +29,7 @@ SPEND_COMPLETIONS = {"amount_spent", "amount_spent_usd"}
 
 # ---- B2 的守卫重写：从"空转的 for 循环"变成"有阳性对照的检查"（评审第 2 轮）----
 
-from pactpay.pact_spec import check_deny_strictly_below_spend_completions  # noqa: E402
+from pactpay.policy.spec import check_deny_strictly_below_spend_completions  # noqa: E402
 
 
 def _spec_with(completion_type: str, threshold: str, deny_cap: str = ROLLING_24H_CAP) -> dict:

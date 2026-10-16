@@ -15,7 +15,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from pactpay.payee.app import CHEAP_REPORT, create_app
+from pactpay.demo.payee.app import CHEAP_REPORT, create_app
 
 # 手写字面量：Base Sepolia USDC（链上 name()=="USDC"、decimals()==6，已独立核验）
 USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
@@ -89,7 +89,7 @@ def test_the_paid_success_path_is_covered_end_to_end_not_by_this_offline_suite()
 
     这条测试的作用是**钉住这个事实**，免得后来人以为离线套件覆盖了付费路径。
     """
-    from pactpay.payee.app import build_routes
+    from pactpay.demo.payee.app import build_routes
 
     routes = build_routes(PAY_TO)
 
@@ -108,7 +108,7 @@ def test_route_prices_are_the_ones_the_acceptance_cases_assume(path: str, price:
     价格写在两处（路由配置的 `$` 写法 + 中间件吐出的原子单位），
     这条钉住"写下去的那一半"，另一半由 A2 的真 402 响应钉住。
     """
-    from pactpay.payee.app import build_routes
+    from pactpay.demo.payee.app import build_routes
 
     entry = build_routes(PAY_TO)[path]
 
@@ -137,7 +137,7 @@ def test_each_paid_route_delivers_its_own_report():
     现在映射提成了 `REPORTS` 常量，这条直接把"路径 → 报告"作为数据断言下来。
     报告必须**各不相同**，否则这条断言本身会退化成恒真。
     """
-    from pactpay.payee.app import CHEAP_REPORT, PREMIUM_REPORT, REPORTS
+    from pactpay.demo.payee.app import CHEAP_REPORT, PREMIUM_REPORT, REPORTS
 
     assert REPORTS["GET /api/cheap"] is CHEAP_REPORT, "cheap 路径交付的不是便宜接口的报告"
     assert REPORTS["GET /api/premium"] is PREMIUM_REPORT, "premium 路径交付的不是贵接口的报告"
@@ -150,7 +150,7 @@ def test_the_cheap_report_is_actually_cheaper_and_thinner():
     否则"Agent 先买便宜的、再想买贵的"这个故事就没有说服力 ——
     两条路径若交付同样的东西，超限被拒那笔也就没有代价可言。
     """
-    from pactpay.payee.app import CHEAP_REPORT, PREMIUM_REPORT
+    from pactpay.demo.payee.app import CHEAP_REPORT, PREMIUM_REPORT
 
     assert CHEAP_REPORT["report_id"] != PREMIUM_REPORT["report_id"]
     assert "note" in CHEAP_REPORT and "note" in PREMIUM_REPORT

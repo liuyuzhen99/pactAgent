@@ -15,9 +15,9 @@ from typing import Any
 
 import pytest
 
-from pactpay.agent import PurchaseOutcome
-from pactpay.agent_loop import StepLimitExceeded, build_system_prompt, run_agent
-from pactpay.tools import ToolContext, dispatch, tool_purchase
+from pactpay.agent.pay import PurchaseOutcome
+from pactpay.agent.loop import StepLimitExceeded, build_system_prompt, run_agent
+from pactpay.agent.tools import ToolContext, dispatch, tool_purchase
 
 
 # ── 替身 ────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ def make_ctx(budget: str = "0.1", balance: str = "20") -> ToolContext:
 def stub_buy(monkeypatch, *, outcome: str, data: dict | None = None,
              denial: dict | None = None, tx: str | None = None) -> None:
     """把 `agent.buy` 换成返回固定结果 —— 不碰网络、不花钱。"""
-    import pactpay.tools as tools_module
+    import pactpay.agent.tools as tools_module
 
     def fake_buy(client, payee_base, purchase, *, wallet_uuid, pact_api_key):
         return PurchaseOutcome(

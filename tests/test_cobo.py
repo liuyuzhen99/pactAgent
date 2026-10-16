@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from pactpay.cobo import CoboClient, PolicyDenied, parse_denial
+from pactpay.platform.cobo import CoboClient, PolicyDenied, parse_denial
 
 # 真实响应体的逐字副本（2026-10-10 对 Cobo 生产实测拿到的那一笔）。
 # 注意它是**嵌在 error 下**的，官方文档里那个扁平示例是错的。

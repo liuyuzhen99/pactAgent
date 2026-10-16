@@ -30,11 +30,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from .agent import probe_default_deny
-from .agent_loop import StepLimitExceeded, run_agent
-from .cobo import CoboClient
-from .config import CHAIN_ID, TOKEN_ID, load_existing
-from .demo import (
+from pactpay.agent.pay import probe_default_deny
+from pactpay.agent.loop import StepLimitExceeded, run_agent
+from pactpay.platform.cobo import CoboClient
+from pactpay.platform.config import CHAIN_ID, TOKEN_ID, load_existing
+from pactpay.demo.run import (
     BUDGET_USD,
     DEFAULT_DENY_AMOUNT,
     OUTSIDE_WHITELIST,
@@ -42,7 +42,7 @@ from .demo import (
     TASK,
     build_demo_pact_spec,
 )
-from .evidence import (
+from pactpay.evidence import (
     EVIDENCE_DIR,
     OUTCOMES,
     append_record,
@@ -53,11 +53,11 @@ from .evidence import (
     write_counts,
     write_run_meta,
 )
-from .onchain import current_block_number, verify_usdc_transfer
-from .payee_lifecycle import ensure_payee
-from .planner import usd_to_atomic
-from .preconditions import find_balance, require_balance
-from .tools import ToolContext, to_json
+from pactpay.platform.onchain import current_block_number, verify_usdc_transfer
+from pactpay.demo.payee_lifecycle import ensure_payee
+from pactpay.agent.planner import usd_to_atomic
+from pactpay.agent.preconditions import find_balance, require_balance
+from pactpay.agent.tools import ToolContext, to_json
 
 
 def _print_transcript(ctx: ToolContext) -> None:

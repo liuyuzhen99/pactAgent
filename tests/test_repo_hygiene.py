@@ -246,13 +246,27 @@ def test_readme_lists_every_module_under_pactpay():
     # **必须按"目录树里的一个条目"来比对，不能只查子串**（评审 M29）：
     # 原来用 `path.name not in readme`，把 README 里的行改成 `config.py.bak`
     # 仍然通过 —— 名字还在，但它已经不是那个文件了。子串存在性冒充不了结构检查。
-    listed = {
-        m.group(1)
-        for m in re.finditer(r"^[\s│├└─|]*([A-Za-z_][\w.]*\.py)\s", readme, re.M)
-    }
+    #
+    # **第 8 步改成比相对路径**：`pactpay/` 按职责分了子包以后，光比文件名会撞车
+    # （`payee/app.py` 与 `dashboard/app.py` 都叫 `app.py`），而且"列出了 app.py"
+    # 完全可能是列在**别的目录**下面。所以现在把条目所在的目录一起解析出来，
+    # 拼成相对路径再比 —— **目录层次本身就是被检查的东西**。
+    listed: set[str] = set()
+    current_dir: list[str] = []
+    for line in readme.splitlines():
+        dir_match = re.match(r"^[\s│├└─|]*([A-Za-z_]\w*)/\s", line)
+        if dir_match:
+            current_dir = [dir_match.group(1)]
+            continue
+        # 文件名允许带斜杠：嵌套更深时 README 里直接写 `demo/payee/app.py`
+        file_match = re.match(r"^[\s│├└─|]*([A-Za-z_][\w./]*\.py)\s", line)
+        if file_match and current_dir:
+            entry = file_match.group(1)
+            listed.add(entry if "/" in entry else "/".join(current_dir + [entry]))
+
     expected = {
-        path.name
-        for path in (REPO / "pactpay").glob("*.py")
+        str(path.relative_to(REPO / "pactpay"))
+        for path in (REPO / "pactpay").rglob("*.py")
         if path.name != "__init__.py"
     }
     missing = sorted(expected - listed)
@@ -365,7 +379,7 @@ def test_demo_does_not_short_circuit_the_paid_guard():
     """
     import re
 
-    src = (REPO / "pactpay/demo.py").read_text()
+    src = (REPO / "pactpay/demo/run.py").read_text()
 
     # **只看代码行，跳过注释。** demo 里那段注释**必须**写出这个错误写法
     # （它解释了为什么不能这么写）；把注释也算成违规，就等于逼着人删掉解释。
@@ -411,3 +425,39 @@ def test_boundary_check_scans_only_the_shipped_package():
         "扫它会让这个目标恒红（N1 复发）"
     )
     assert "\\b" in commands, "缺少词边界，`defi` 会匹配 `defined`/`definition`"
+
+
+def test_pactpay_keeps_its_responsibility_subpackages():
+    """`pactpay/` 必须保持按职责分的子包 —— 不许再摊回一个大平层。
+
+    **为什么要钉住**（第 8 步）：26 个模块平铺在一个目录里时，光看文件名分不出
+    谁是谁、谁是底层谁是展示层；README 里那种"按职责分组"的目录树是**画出来**的，
+    仓库里并不存在。现在分组是真的了，就得让它**不能悄悄退化**：
+    新模块如果直接扔在 `pactpay/` 顶层，这条会红。
+
+    **顶层只允许放包**，不放实现模块。
+    """
+    top_level_files = sorted(
+        p.name
+        for p in (REPO / "pactpay").glob("*.py")
+        if "__pycache__" not in p.parts
+    )
+    assert top_level_files == ["__init__.py"], (
+        f"`pactpay/` 顶层只应有 `__init__.py`，但发现：{top_level_files}\n"
+        "新模块请放进对应职责的子包（platform/policy/agent/evidence/"
+        "governance/checks/demo/spike）。"
+    )
+
+    expected = {
+        "platform": {"cobo.py", "config.py", "onchain.py"},
+        "policy": {"spec.py", "check.py"},
+        "agent": {"loop.py", "tools.py", "planner.py", "llm_planner.py",
+                  "run.py", "pay.py", "preconditions.py"},
+        "evidence": {"__init__.py", "verify.py", "block.py"},
+        "governance": {"revoke.py", "events.py"},
+        "checks": {"complete.py", "cumulative.py"},
+        "demo": {"run.py", "payee_lifecycle.py"},
+    }
+    for pkg, want in expected.items():
+        got = {p.name for p in (REPO / "pactpay" / pkg).glob("*.py")}
+        assert want <= got, f"`pactpay/{pkg}/` 少了这些模块：{sorted(want - got)}（实际：{sorted(got)}）"

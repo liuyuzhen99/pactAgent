@@ -18,8 +18,8 @@ import os
 import sys
 from pathlib import Path
 
-from pactpay.cobo import CoboClient, CoboError, PolicyDenied
-from pactpay.config import CHAIN_ID, TOKEN_ID, load_existing, save_env
+from pactpay.platform.cobo import CoboClient, CoboError, PolicyDenied
+from pactpay.platform.config import CHAIN_ID, TOKEN_ID, load_existing, save_env
 
 # 探针专用 Pact 的已知上限。取 0.001 是为了让"超限"这件事有一个明确的、可复核的边界。
 PROBE_CAP = "0.001"

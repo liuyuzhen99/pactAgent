@@ -15,8 +15,8 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from pactpay import event_watch, revoke_check
-from pactpay.cobo import CoboError, PolicyDenied
+from pactpay.governance import events as event_watch, revoke as revoke_check
+from pactpay.platform.cobo import CoboError, PolicyDenied
 
 
 class FakePactClient:

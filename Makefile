@@ -35,31 +35,31 @@ a0e:
 
 # 收款方。PAY_TO_ADDRESS 从 .env 读（t0-probe 首次运行会写进去）。
 payee:
-	$(PY) -m pactpay.payee.app
+	$(PY) -m pactpay.demo.payee.app
 
 # 演示主流程：任务/预算 → 采购计划 → Pact → 逐笔采购 → 证据落盘。
 # 需要先 make payee，且 agent 钱包里有 Base Sepolia USDC。
 demo:
-	$(PY) -m pactpay.demo
+	$(PY) -m pactpay.demo.run
 
 agent: ## 让模型自己驱动一次真实采购（Agent 主循环，工具调用）
-	.venv/bin/python -m pactpay.agent_run
+	.venv/bin/python -m pactpay.agent.run
 
 revoke-check: ## 撤销 Pact 后同一个 key 立刻失效（零成本：全程只用超限转账）
-	.venv/bin/python -m pactpay.revoke_check
+	.venv/bin/python -m pactpay.governance.revoke
 
 events: ## 订阅 Cobo 事件流，实时看 policy.violated
-	.venv/bin/python -m pactpay.event_watch $(ARGS)
+	.venv/bin/python -m pactpay.governance.events $(ARGS)
 
 # T9：完成条件（tx_count=1）触发后 Pact 自动终止、pact-scoped key 立即失效。
 # 需要先 make payee，且钱包里有测试币（本检查会真的花掉一笔）。
 complete-check:
-	$(PY) -m pactpay.complete_check
+	$(PY) -m pactpay.checks.complete
 
 # A5b：累计总预算。用独立的第二份 Pact（阈值可达）验同一条代码路径——
 # demo Pact 的 0.1 档算术上够不着（单笔 0.01 × 11 笔才到 0.11）。
 cumulative-check:
-	$(PY) -m pactpay.cumulative_check
+	$(PY) -m pactpay.checks.cumulative
 
 # R12：边界声明（不做什么）只允许出现在 README 里。
 # 源码里若冒出 DeFi / 多链之类的实现，说明范围蔓延了——这条能机械地挡住。
@@ -82,7 +82,7 @@ boundary-check:
 
 # A1：逐字段比对提交的 Pact 与服务端回读（限额/白名单被改动是最危险的静默失败）。
 pact:
-	$(PY) -m pactpay.pact_check
+	$(PY) -m pactpay.policy.check
 
 # A7a：校验最近一次运行的证据（哈希链是否完好、计数是否对得上、有无幂等重放）。
 verify:
@@ -94,14 +94,14 @@ verify:
 	@# 要求它**能解析**。于是一个 run.json 被截断的运行会被 `make verify` 挑中
 	@# （而且 verify_run 根本不读 run.json，所以它照样打 ✓），
 	@# 同时看板挑的是**另一个更旧的**目录 —— 两个入口对"最新一次运行"的理解不一致。
-	@latest=$$($(PY) -m pactpay.dashboard.app --latest-run); \
+	@latest=$$($(PY) -m pactpay.demo.dashboard.app --latest-run); \
 	if [ -z "$$latest" ]; then echo "还没有**完整**的证据，先跑 make demo"; exit 1; fi; \
 	echo "校验：$$latest"; \
 	$(PY) -m pactpay.evidence.verify "$$latest"
 
 # 证据展示页（读 evidence/ 里最近一次运行的结果）。
 dashboard:
-	$(PY) -m uvicorn pactpay.dashboard.app:app --host 127.0.0.1 --port 8000
+	$(PY) -m uvicorn pactpay.demo.dashboard.app:app --host 127.0.0.1 --port 8000
 
 test:
 	$(PY) -m pytest -q

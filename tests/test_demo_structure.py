@@ -38,7 +38,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-DEMO = REPO / "pactpay" / "demo.py"
+DEMO = REPO / "pactpay" / "demo" / "run.py"
 
 
 @pytest.fixture(scope="module")
@@ -312,7 +312,7 @@ def test_the_probe_trace_is_actually_measured(demo_tree: ast.Module):
 
 def test_require_a5c_holds_aborts_when_the_x402_trace_is_false():
     """A5c③ 对 x402 那笔**明确不成立** ⇒ 必须抛。"""
-    from pactpay.demo import require_a5c_holds
+    from pactpay.demo.run import require_a5c_holds
 
     x402 = {"structured_denial": True, "no_chain_trace": False}
     matched = {"structured_denial": True, "no_chain_trace": True}
@@ -326,7 +326,7 @@ def test_require_a5c_holds_aborts_when_the_x402_trace_is_false():
 
 def test_require_a5c_holds_aborts_when_the_matched_rule_trace_is_false():
     """A5c③ 对**命中规则那笔**不成立 ⇒ 也必须抛（只守一条路径是 F3c 的原始形态）。"""
-    from pactpay.demo import require_a5c_holds
+    from pactpay.demo.run import require_a5c_holds
 
     x402 = {"structured_denial": True, "no_chain_trace": True}
     matched = {"structured_denial": True, "no_chain_trace": False}
@@ -337,7 +337,7 @@ def test_require_a5c_holds_aborts_when_the_matched_rule_trace_is_false():
 
 def test_require_a5c_holds_aborts_when_the_denial_is_not_structured():
     """A5c①（拒绝必须是结构化的）不成立 ⇒ 同样中止。"""
-    from pactpay.demo import require_a5c_holds
+    from pactpay.demo.run import require_a5c_holds
 
     x402 = {"structured_denial": False, "no_chain_trace": True}
     matched = {"structured_denial": True, "no_chain_trace": True}
@@ -351,7 +351,7 @@ def test_require_a5c_holds_passes_when_everything_holds():
 
     没有这一条，上面三条可能只是"永远抛"。
     """
-    from pactpay.demo import require_a5c_holds
+    from pactpay.demo.run import require_a5c_holds
 
     both = {"structured_denial": True, "no_chain_trace": True}
 
@@ -364,7 +364,7 @@ def test_require_a5c_holds_does_not_treat_unmeasured_as_failure():
     把"没测"当成"没通过"会假报警；反过来把"没通过"当成"没测"就是**把没证明当成证明了**。
     这里钉住的是前者：判据缺失时不该中止（那种情况由 `verify` 的结论去说"没测"）。
     """
-    from pactpay.demo import require_a5c_holds
+    from pactpay.demo.run import require_a5c_holds
 
     unmeasured = {"structured_denial": None, "no_chain_trace": None}
 
@@ -373,7 +373,7 @@ def test_require_a5c_holds_does_not_treat_unmeasured_as_failure():
 
 def test_guard_a5c_aborts_on_a_failed_trace():
     """采购循环里那道早中止：`ok=False` ⇒ 抛。"""
-    from pactpay.demo import guard_a5c
+    from pactpay.demo.run import guard_a5c
 
     with pytest.raises(RuntimeError) as excinfo:
         guard_a5c({"ok": False, "why": "阳性对照没数到转账"}, label="x402 被拒那笔")
@@ -384,7 +384,7 @@ def test_guard_a5c_aborts_on_a_failed_trace():
 
 def test_guard_a5c_passes_a_good_trace_through():
     """**阳性对照**：`ok=True` 时原样返回（返回值还要被下游用）。"""
-    from pactpay.demo import guard_a5c
+    from pactpay.demo.run import guard_a5c
 
     trace = {"ok": True, "verdict": "no_trace", "count": 0, "control_count": 1}
 
@@ -393,7 +393,7 @@ def test_guard_a5c_passes_a_good_trace_through():
 
 def test_guard_a5c_does_not_pass_an_empty_trace():
     """空 trace（没有 `ok` 键）**不许**被当成通过 —— 缺判据 ≠ 判据成立。"""
-    from pactpay.demo import guard_a5c
+    from pactpay.demo.run import guard_a5c
 
     with pytest.raises(RuntimeError):
         guard_a5c({}, label="x402 被拒那笔")
@@ -415,7 +415,7 @@ def test_a4_checkmark_is_impossible_to_render_when_verification_failed():
     """**G4 的核心回归测试**：复核失败 ⇒ 渲染函数必须抛，绝不打 ✅。"""
     import pytest
 
-    from pactpay.demo import render_a4_ok
+    from pactpay.demo.run import render_a4_ok
 
     failed = {
         "ok": False, "checked": True, "why": "链上查不到这笔交易",
@@ -430,7 +430,7 @@ def test_a4_checkmark_requires_having_actually_checked():
     """`checked=False`（压根没去链上查）⇒ 也不许渲染 ✅：没查过就没有"通过"可言。"""
     import pytest
 
-    from pactpay.demo import render_a4_ok
+    from pactpay.demo.run import render_a4_ok
 
     with pytest.raises(RuntimeError, match="没有真的去链上查过"):
         render_a4_ok({"ok": True, "checked": False, "why": ""})
@@ -440,7 +440,7 @@ def test_a4_checkmark_requires_transfer_details():
     """判了 ok 却拿不出转账明细 ⇒ 不渲染（否则 ✅ 里没有可核对的事实）。"""
     import pytest
 
-    from pactpay.demo import render_a4_ok
+    from pactpay.demo.run import render_a4_ok
 
     with pytest.raises(RuntimeError, match="转账明细"):
         render_a4_ok({"ok": True, "checked": True, "transfers": [], "block_number": 9})
@@ -451,7 +451,7 @@ def test_a4_checkmark_renders_the_measured_fields():
 
     没有这条，上面几条可能只是"永远抛异常"。
     """
-    from pactpay.demo import render_a4_ok
+    from pactpay.demo.run import render_a4_ok
 
     line = render_a4_ok({
         "ok": True, "checked": True, "block_number": 48012189,
@@ -469,7 +469,7 @@ def test_a4_checkmark_renders_the_measured_fields():
 
 
 def _outcome(kind: str):
-    from pactpay.agent import PurchaseOutcome
+    from pactpay.agent.pay import PurchaseOutcome
 
     return PurchaseOutcome(
         outcome=kind, resource="/api/x", amount_usd="0.005", description="d",
@@ -483,7 +483,7 @@ def test_a4_line_is_rendered_only_for_a_paid_purchase():
     评审 G4 把 `if outcome.outcome != "paid": return None` 改成 `if False:` 无人变红 ——
     被拒的那笔会去渲染链上复核，而它压根没有链上交易。
     """
-    from pactpay.demo import a4_line_for, purchase_trace_lines
+    from pactpay.demo.run import a4_line_for, purchase_trace_lines
 
     verified = {"ok": True, "checked": True, "block_number": 48014861,
                 "transfers": [{"from": "0xa", "to": "0xb", "value": 5000}]}
@@ -509,7 +509,7 @@ def test_a4_render_refuses_when_the_verification_did_not_pass():
     """
     import pytest
 
-    from pactpay.demo import a4_line_for
+    from pactpay.demo.run import a4_line_for
 
     failed = {"ok": False, "checked": True, "block_number": 48014861,
               "transfers": [{"from": "0xdead", "to": "0xbeef", "value": 1}],
